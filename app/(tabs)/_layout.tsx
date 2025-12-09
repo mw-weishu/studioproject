@@ -1,11 +1,18 @@
+import FontAwesome from '@expo/vector-icons/Octicons';
 import { Stack, Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { firebase } from '@/firebase.config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+function TabBarIcon(props: {
+  name: React.ComponentProps<typeof FontAwesome>['name'];
+  color: string;
+}) {
+  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -44,22 +51,25 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: '',
+          // title: 'Home',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="calendar" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: '',
+          // title: 'Explore',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="search" color={color} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          title: '',
+          // title: 'Account',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="person" color={color} />,
         }}
       />
     </Tabs>

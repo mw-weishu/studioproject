@@ -9,6 +9,9 @@ import BottomLoginSheet from '@/components/BottomLoginSheet';
 import { firebase } from '@/firebase.config';
 import { Text, View } from 'react-native';
 
+import { HoldItem } from '@/components/HoldItem';
+import { router } from 'expo-router';
+
 export default function TabOneScreen() {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
@@ -37,6 +40,21 @@ export default function TabOneScreen() {
       {/* <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" /> */}
       {/* <EditScreenInfo path="app/(tabs)/index.tsx" /> */}
       <CheckoutForm />
+      <HoldItem
+        activateOn='tap'
+        items={[
+          { text: 'explore', onPress: () => {
+            router.navigate('/explore');
+          }},
+          { text: 'account', onPress: () => {
+            router.navigate('/account');
+          }},
+        ]}
+      >
+        <View style={{ marginHorizontal: 50, borderRadius: 20, padding: 20, backgroundColor: '#ddd' }}>
+          <Text>Long press me to see options</Text>
+        </View>
+      </HoldItem>
     </View>
   );
 }

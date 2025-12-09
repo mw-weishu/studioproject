@@ -1,10 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 // import { defaultStyles } from '../constants/Styles'
 import AnimatedIntro from '@/components/AnimatedIntro';
 import { firebase } from '@/firebase.config';
 import { router } from 'expo-router';
+
+import { TextInput } from 'react-native-paper';
 
 
 const Page = () => {
@@ -12,7 +14,6 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const auth = firebase.auth();
 
   const signIn = async () => {
     setLoading(true)
@@ -54,28 +55,31 @@ const Page = () => {
         )}
         {/* <Image style={styles.logo} source={require('../assets/images/logo-white.png')} /> */}
 
-        <Text style={styles.title}>
-          {type === 'login' ? 'Welcome back' : 'Create your account'}
-        </Text>
+        
 
-        <View style={{marginBottom: 20 }}>
-          <TextInput
-            autoCapitalize='none'
-            placeholder='Email'
-            style={styles.inputField}
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            autoCapitalize='none'
-            placeholder='Password'
-            style={styles.inputField}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+
+
+        <View style={styles.auth}>
+          <TextInput 
+        label="Email" 
+        mode='outlined'
+        value={email} 
+        onChangeText={setEmail}
+        // onKeyPress={handleEnterPress}
+        style={{height: 50, width: 300}}
+        />
+      <TextInput 
+        label="Password" 
+        mode='outlined'
+        value={password} 
+        onChangeText={setPassword}
+        // onKeyPress={handleEnterPress}
+        secureTextEntry={true}
+        style={{height: 50, width: 300}}
+        />
         </View>
 
+        <View style={styles.auth} >
         {type === 'login' ? (
           // <TouchableOpacity onPress={signIn} style={[defaultStyles.btn, styles.btnPrimary]}>
           <TouchableOpacity onPress={signIn}>
@@ -87,6 +91,7 @@ const Page = () => {
             <Text style={styles.btnPrimaryText}>Create acount</Text>
           </TouchableOpacity>
         )}
+        </View>
 
       </KeyboardAvoidingView>
     </View>
@@ -94,6 +99,14 @@ const Page = () => {
 }
 
 const styles = StyleSheet.create({
+  auth: {
+    marginTop: 10,
+    gap: 10,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+
+  },
   wrapper: {
     flex: 1,
     position: 'relative',

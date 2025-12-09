@@ -1,5 +1,6 @@
+import { darkTheme } from '@/theme/Theme';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +9,9 @@ import 'react-native-reanimated';
 
 import { firebase } from '@/firebase.config';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { StatusBar } from 'expo-status-bar';
+import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -66,24 +70,22 @@ function RootLayoutNav({ isSignedIn }: { isSignedIn: boolean }) {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      {isSignedIn ? (
-        // Show unauthenticated screens
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen
-            name="login"
-            options={{
-              presentation: 'modal',
-            }}
+    <SafeAreaProvider>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }}>
+        <PaperProvider theme={colorScheme === 'dark' ? darkTheme : darkTheme}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DarkTheme}>
+          
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          
+          <StatusBar 
+            style={'light'} 
+            backgroundColor={'black'}
           />
-        </Stack>
-      ) : (
-        // Show authenticated screens
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      )}
-    </ThemeProvider>
+        </ThemeProvider>
+        </PaperProvider>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
