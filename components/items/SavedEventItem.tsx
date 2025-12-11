@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { HoldItem } from '../HoldItem';
 
 const formatTime = (dateString: string) => {
@@ -30,7 +30,6 @@ const SavedEventItem = ({event}: {event: any}) => {
       items={MenuItems}
       activateOn='tap'
     >
-      <Pressable onPress={() => void 0} style={styles.item}>
         <View style={styles.itemInner} />
         <View style={styles.itemPadding}>
           <View>
@@ -51,7 +50,6 @@ const SavedEventItem = ({event}: {event: any}) => {
             </View>
           </View>
         </View>
-      </Pressable>
     </HoldItem>
   );
 };

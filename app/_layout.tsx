@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { firebase } from '@/firebase.config';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -67,13 +66,11 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav({ isSignedIn }: { isSignedIn: boolean }) {
-  const colorScheme = useColorScheme();
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }}>
-        <PaperProvider theme={colorScheme === 'dark' ? darkTheme : darkTheme}>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DarkTheme}>
+        <PaperProvider theme={darkTheme}>
+        <ThemeProvider value={DarkTheme}>
           
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" />

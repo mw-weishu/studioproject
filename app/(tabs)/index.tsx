@@ -1,17 +1,15 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 // import EditScreenInfo from '@/components/EditScreenInfo';
 // import { Text, View } from '@/components/Themed';
 import AnimatedIntro from '@/components/AnimatedIntro';
 import BottomLoginSheet from '@/components/BottomLoginSheet';
-import { HoldItem } from '@/components/HoldItem';
-import CheckoutForm from '@/components/payment-sheet';
+import MyPager from '@/components/pages/MyPager';
 import { firebase } from '@/firebase.config';
-import { getEventsForDate } from '@/utilities/EventsStore';
 import { observer } from '@legendapp/state/react';
-import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 
 // const SavedEventItem = React.lazy(() => import('@/components/items/SavedEventItem'));
@@ -27,70 +25,8 @@ const formatTime = (dateString: string) => {
     return `${formattedHours}:${formattedMinutes} ${ampm}`;
 };
 
-const Item = ({event}: {event: any}) => {
-
-  const MenuItems = [
-    // { text: 'Actions', icon: 'home', isTitle: true, onPress: () => {} },
-    { text: 'Edit', icon: 'edit', onPress: () => {
-    //   setEventData(event);
-    //   stateNavigator.navigate('edit-event');
-    }},
-    { text: 'Apply to Dates', icon: 'calendar', withSeparator: true, onPress: () => {
-    //   selectedSavedEventData$.set({
-    //     ...event,
-    //   });
-    //   openDate$.case.set('saved-event-apply');
-    //   stateNavigator.navigate('calendar');
-    }},
-    { text: 'Delete', icon: 'trash', isDestructive: true, onPress: () => {
-    //   selectedSavedEventData$.set(event);
-    //   handleDelete();
-    }},
-  ];
-  
-  return (
-    <HoldItem
-        items={MenuItems}
-        activateOn='tap'
-        >
-        <Pressable onPress={() => void 0} style={styles.item}>
-          <View style={styles.itemInner}>
-          </View>
-          <View style={styles.itemPadding}>
-            <View>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <View style={{ flexDirection: 'row', alignItems: 'center'}}>
-              <Text style={!event.blank ? styles.itemTitleText : styles.blankItemTitleText}>{event.title}</Text>
-            </View>
-            <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
-              <Text>{formatTime(event.startDate)} - {formatTime(event.endDate)}</Text>
-            </View>
-          </View>
-            <View style={styles.rowItemsNonActive}>
-           
-              <View style={styles.itemPercentageOutlineNonActive}>
-                <View>
-                  {/* <Text style={!event.blank ? styles.itemTitleText : styles.blankItemTitleText}>xxx</Text> */}
-                </View>
-              </View>
-            </View>
-        </View>
-          </View>
-        </Pressable>
-        </HoldItem>
-  );
-}
-
 const TabOneScreen = observer(() => {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
-  
-  // Convert object with numeric keys to array
-  // const savedEventsObj = savedEvents$.get() || {};
-  // const savedEvents = Object.values(savedEventsObj).filter(item => 
-  //   typeof item === 'object' && item !== null && 'id' in item
-  // );
-
-  const events = getEventsForDate('20251211');
 
   React.useEffect(() => {
     const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
@@ -109,46 +45,22 @@ const TabOneScreen = observer(() => {
     );
   }
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} />
-      {/* <EditScreenInfo path="app/(tabs)/index.tsx" /> */}
-      <CheckoutForm />
-      <HoldItem
-        activateOn='tap'
-        items={[
-          { text: 'explore', onPress: () => {
-            router.navigate('/explore');
-          }},
-          { text: 'account', onPress: () => {
-            router.navigate('/account');
-          }},
-        ]}
-      >
-        <View style={{ marginHorizontal: 50, borderRadius: 20, padding: 20, backgroundColor: '#ddd' }}>
-          <Text>Long press me to see options</Text>
-        </View>
-      </HoldItem>
-      <ScrollView style={{ flex: 1, marginHorizontal: 20 }}>
-        <Text style={{color: 'white', fontSize: 16, fontWeight: 'bold', marginBottom: 10}}>Saved Events ({events.length})</Text>
-        {events.length === 0 ? (
-          <Text style={{color: 'gray'}}>No saved events.</Text>
-        ) : (
-          events.map((event: any) => (
-            <Item key={event.id} event={event} />
-          ))
-        )}
-      </ScrollView>
-    </View>
+    <GestureHandlerRootView style={styles.container}>
+      <View style={{ maxWidth: 500, height: "100%", width: '100%' }}>
+      <MyPager />
+
+      </View>
+    </GestureHandlerRootView>
   );
 });
 
 export default TabOneScreen;
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    // alignItems: 'center',
-    // justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 20,
