@@ -12,7 +12,7 @@ import { observable } from '@legendapp/state';
 // import { formatDate } from '../utilities/Pickers';
 // import { routeState$, stateNavigator } from '../nav/stateNavigator';
 // import { set } from 'date-fns';
-import { CalendarImperativeApi } from 'react-native-swipe-calendar';
+import Calendar, { CalendarImperativeApi } from 'react-native-swipe-calendar';
 // import { setDefaultScheduleData } from '../utilities/Schedules';
 // import { initialScheduleIndex$ } from './edit/Schedule';
 
@@ -342,18 +342,12 @@ const MyPager = observer(() => {
 
       
     }
-    
-    const [state, setState] = React.useState({ open: false });
-    
-      const onStateChange = ({ open }: { open: boolean }) => setState({ open });
-    
-      const { open } = state;
 
     
 
     return (
     <GestureHandlerRootView>
-      {/* <Calendar
+      <Calendar
         theme={{ 
           todayIndicatorDotColor: 'royalblue',
           headerFontColor: 'white',
@@ -405,7 +399,7 @@ const MyPager = observer(() => {
           // console.log('Date: ', date);
 
         }}
-      /> */}
+      />
       <View style={{height: 10}}>
         {/* <Text>{suppressFirstTime.current}</Text> */}
       </View>
@@ -439,36 +433,6 @@ const MyPager = observer(() => {
         :
          null
         } */}
-        {/* <FAB.Group
-          style={{bottom: 60, right: 8, borderRadius: 20,}}
-          fabStyle={{borderRadius: 20, backgroundColor: 'rgba(252, 186, 3, 0.6)'}}
-          open={open}
-          visible
-          icon={open ? 'close' : 'plus'}
-          actions={[
-            {
-              icon: 'calendar',
-              label: 'Event',
-              onPress: () => {
-                // setDefaultEventData();
-                // stateNavigator.navigate('edit-event')
-              },
-            },
-            {
-              icon: 'calendar-text',
-              label: 'Schedule',
-              onPress: () => {
-                // setDefaultScheduleData();
-                // initialScheduleIndex$.set(0);
-                // stateNavigator.navigate('edit-schedule');
-              },
-            },
-          ]}
-          onStateChange={onStateChange}
-          onPress={() => {
-            setState({ open: !open });
-          }}
-        /> */}
     </GestureHandlerRootView>
     );
 });

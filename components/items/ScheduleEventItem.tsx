@@ -3,9 +3,9 @@ import React, { useCallback } from 'react';
 import { View as DefaultView, StyleSheet } from 'react-native';
 import { Pressable, Text, View } from '../../theme/Themed';
 import { HoldItem } from '../HoldItem';
-// import { selectedEventData$, setEventData } from '../../utilities/Events';
-// import { openDate$ } from '../../utilities/Pickers';
-// import { handleDelete, selectedSavedEventData$ } from '../../utilities/SEvents';
+// import { handleDeleteScheduleEvent, selectedEventData$, setEventData } from '../../utilities/Events';
+import { addToSavedEvents } from '../../utilities/EventsStore';
+// import { selectedScheduleData$, setScheduleDataByEventId } from '../../utilities/Schedules';
 
 
 interface ItemProps {
@@ -53,22 +53,21 @@ const SavedItem = observer((eventProps: ItemProps) => {
   const {day} = eventProps;
 
   const MenuItems = [
-    // { text: 'Actions', icon: 'home', isTitle: true, onPress: () => {} },
+    { text: 'Actions', icon: 'home', isTitle: true, onPress: () => {} },
     { text: 'Edit', icon: 'edit', onPress: () => {
-    //   setEventData(event);
-    //   stateNavigator.navigate('edit-event');
+      // setEventData(event);
+      // stateNavigator.navigate('edit-event');
     }},
-    { text: 'Apply to Dates', icon: 'calendar', withSeparator: true, onPress: () => {
-    //   selectedSavedEventData$.set({
-    //     ...event,
-    //   });
-    //   openDate$.case.set('saved-event-apply');
-    //   stateNavigator.navigate('calendar');
+    { text: 'Save', icon: 'save', withSeparator: true, onPress: () => {
+      addToSavedEvents(event);
     }},
     { text: 'Delete', icon: 'trash', isDestructive: true, onPress: () => {
-    //   selectedSavedEventData$.set(event);
-    //   handleDelete();
-    }},
+      // console.log('event type: ', event.eventType);
+            // setScheduleDataByEventId(event.id);
+            
+            // selectedEventData$.id.set(event.id);
+            // handleDeleteScheduleEvent(selectedScheduleData$.dayIndex.get());
+    } },
   ];
 
   const itemPressed = useCallback(() => {

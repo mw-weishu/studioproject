@@ -10,6 +10,7 @@ import { firebase } from '@/firebase.config';
 import { observer } from '@legendapp/state/react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FAB } from 'react-native-paper';
 
 
 // const SavedEventItem = React.lazy(() => import('@/components/items/SavedEventItem'));
@@ -36,6 +37,12 @@ const TabOneScreen = observer(() => {
     return unsubscribe;
   }, []);
 
+  const [state, setState] = React.useState({ open: false });
+    
+      const onStateChange = ({ open }: { open: boolean }) => setState({ open });
+    
+      const { open } = state;
+
   if (!isSignedIn) {
     return (
       <View style={{flex: 1}}>
@@ -48,7 +55,36 @@ const TabOneScreen = observer(() => {
     <GestureHandlerRootView style={styles.container}>
       <View style={{ maxWidth: 500, height: "100%", width: '100%' }}>
       <MyPager />
-
+      <FAB.Group
+                style={{bottom: 60, right: 8, borderRadius: 20,}}
+                fabStyle={{borderRadius: 20, backgroundColor: 'rgba(252, 186, 3, 0.6)'}}
+                open={open}
+                visible
+                icon={open ? 'close' : 'plus'}
+                actions={[
+                  {
+                    icon: 'calendar',
+                    label: 'Event',
+                    onPress: () => {
+                      // setDefaultEventData();
+                      // stateNavigator.navigate('edit-event')
+                    },
+                  },
+                  {
+                    icon: 'calendar-text',
+                    label: 'Schedule',
+                    onPress: () => {
+                      // setDefaultScheduleData();
+                      // initialScheduleIndex$.set(0);
+                      // stateNavigator.navigate('edit-schedule');
+                    },
+                  },
+                ]}
+                onStateChange={onStateChange}
+                onPress={() => {
+                  setState({ open: !open });
+                }}
+              />
       </View>
     </GestureHandlerRootView>
   );

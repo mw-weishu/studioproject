@@ -57,10 +57,26 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="saved"
         options={{
           title: '',
-          // title: 'Explore',
+          // title: 'Saved',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="bookmark" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="ai"
+        options={{
+          title: '',
+          // title: 'Routime AI',
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="sparkle" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: '',
+          // title: 'Search',
           tabBarIcon: ({ color }) => <FontAwesome size={28} name="search" color={color} />,
         }}
       />
