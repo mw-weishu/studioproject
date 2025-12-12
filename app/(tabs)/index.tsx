@@ -5,9 +5,13 @@ import { StyleSheet } from 'react-native';
 // import { Text, View } from '@/components/Themed';
 import AnimatedIntro from '@/components/AnimatedIntro';
 import BottomLoginSheet from '@/components/BottomLoginSheet';
+import { initialScheduleIndex$ } from '@/components/edit/Schedule';
 import MyPager from '@/components/pages/MyPager';
 import { firebase } from '@/firebase.config';
+import { setDefaultEventData } from '@/utilities/Events';
+import { setDefaultScheduleData } from '@/utilities/Schedules';
 import { observer } from '@legendapp/state/react';
+import { router } from 'expo-router';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FAB } from 'react-native-paper';
@@ -56,7 +60,7 @@ const TabOneScreen = observer(() => {
       <View style={{ maxWidth: 500, height: "100%", width: '100%' }}>
       <MyPager />
       <FAB.Group
-                style={{bottom: 60, right: 8, borderRadius: 20,}}
+                style={{bottom: -6, right: 8, borderRadius: 20,}}
                 fabStyle={{borderRadius: 20, backgroundColor: 'rgba(252, 186, 3, 0.6)'}}
                 open={open}
                 visible
@@ -66,17 +70,17 @@ const TabOneScreen = observer(() => {
                     icon: 'calendar',
                     label: 'Event',
                     onPress: () => {
-                      // setDefaultEventData();
-                      // stateNavigator.navigate('edit-event')
+                      setDefaultEventData();
+                      router.navigate('/edit-event');
                     },
                   },
                   {
                     icon: 'calendar-text',
                     label: 'Schedule',
                     onPress: () => {
-                      // setDefaultScheduleData();
-                      // initialScheduleIndex$.set(0);
-                      // stateNavigator.navigate('edit-schedule');
+                      setDefaultScheduleData();
+                      initialScheduleIndex$.set(0);
+                      router.navigate('/edit-schedule');
                     },
                   },
                 ]}

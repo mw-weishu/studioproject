@@ -1,14 +1,15 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Easing,
-    GestureResponderEvent,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  Easing,
+  GestureResponderEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
+import { usePortal } from './PortalHost';
 
 export interface HoldMenuAction {
   text: string;
@@ -22,6 +23,7 @@ interface HoldItemProps {
   activateOn?: 'tap' | 'longPress';
   onMenuOpen?: () => void;
   onMenuClose?: () => void;
+  hitSlop?: { top?: number; left?: number; right?: number; bottom?: number } | number;
 }
 
 export const HoldItem = ({
@@ -30,22 +32,32 @@ export const HoldItem = ({
   activateOn = 'longPress',
   onMenuOpen,
   onMenuClose,
+  hitSlop,
 }: HoldItemProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(false); // keep overlay/menu during closing animation
+  const [isVisible, setIsVisible] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [itemDimensions, setItemDimensions] = useState({ width: 0, height: 0 });
+  const [itemPosition, setItemPosition] = useState({ x: 0, y: 0 });
   const blurAnimRef = useRef(new Animated.Value(0)).current;
   const scaleAnimRef = useRef(new Animated.Value(0)).current;
   const itemScaleRef = useRef(new Animated.Value(1)).current;
   const childrenRef = useRef<View>(null);
   const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { addPortal, removePortal } = usePortal();
+  const portalIdRef = useRef(`holditem-${Math.random()}`).current;
 
   const openMenu = (event: GestureResponderEvent) => {
     if (childrenRef.current) {
       childrenRef.current.measure((x, y, width, height, pageX, pageY) => {
+        // Store dimensions and position for menu and item copy positioning
+        setItemDimensions({ width, height });
+        setItemPosition({ x: pageX, y: pageY });
+        
+        // Menu positioned below the item
         setMenuPosition({
           x: pageX + width / 2,
-          y: pageY + height,
+          y: pageY + height + 4, // Small gap between item and menu
         });
         setIsVisible(true);
         setIsMenuOpen(true);
@@ -102,9 +114,10 @@ export const HoldItem = ({
     ]).start(({ finished }) => {
       if (finished) {
         setIsVisible(false);
+        removePortal(portalIdRef);
       }
     });
-  }, [onMenuClose, blurAnimRef, scaleAnimRef, itemScaleRef]);
+  }, [onMenuClose, blurAnimRef, scaleAnimRef, itemScaleRef, removePortal, portalIdRef]);
 
   const handleMenuItemPress = (action: HoldMenuAction) => {
     action.onPress();
@@ -156,55 +169,66 @@ export const HoldItem = ({
     };
   }, [closeMenu]);
 
-  return (
-    <>
-      {isVisible && (
+  // Update portal whenever menu state changes
+  useEffect(() => {
+    if (isVisible) {
+      const menuScale = scaleAnimRef.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.3, 1],
+      });
+
+      const portalContent = (
         <>
-          {/* Dark overlay backdrop */}
+          {/* Full-screen dark overlay backdrop */}
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
               styles.overlay,
-              { opacity: blurAnimRef },
+              { opacity: blurAnimRef, zIndex: 998 },
             ]}
+            pointerEvents="none"
           />
-          {/* Tap catcher above overlay */}
-          <Animated.View style={[StyleSheet.absoluteFill, { zIndex: 1000, opacity: blurAnimRef }]}>
+          {/* Tap catcher above overlay - full screen, tap closes menu */}
+          <Animated.View 
+            style={[
+              StyleSheet.absoluteFill, 
+              { zIndex: 1000, opacity: blurAnimRef }
+            ]}
+            pointerEvents={isMenuOpen ? 'auto' : 'none'}
+          >
             <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
           </Animated.View>
-        </>
-      )}
+          
+          {/* Item copy positioned absolutely above overlay */}
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: itemPosition.x,
+                top: itemPosition.y,
+                width: itemDimensions.width,
+                height: itemDimensions.height,
+                transform: [{ scale: itemScaleRef }],
+                zIndex: 1001,
+              },
+            ]}
+            pointerEvents="none"
+          >
+            {children}
+          </Animated.View>
 
-      {/* Children always on top when menu is open */}
-      <Animated.View
-        style={[
-          { transform: [{ scale: itemScaleRef }] },
-          isVisible ? { zIndex: 1001 } : null,
-        ]}
-      >
-        <Pressable
-          ref={childrenRef}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={handlePress}
-        >
-          {children}
-        </Pressable>
-      </Animated.View>
-
-      {isVisible && (
-        <>
-          {/* Menu below the item */}
+          {/* Menu positioned absolutely relative to screen */}
           <Animated.View
             style={[
               styles.menuContainer,
               {
-                left: menuPosition.x - 75, // Approximate menu width / 2
-                top: menuPosition.y + 8,
+                left: menuPosition.x - 75,
+                top: menuPosition.y,
                 transform: [{ scale: menuScale }],
                 zIndex: 1002,
               },
             ]}
+            pointerEvents="box-none"
           >
             {items.map((item, index) => (
               <Pressable
@@ -214,13 +238,39 @@ export const HoldItem = ({
                   index !== items.length - 1 && styles.menuItemBorder,
                 ]}
                 onPress={() => handleMenuItemPress(item)}
+                pointerEvents="auto"
               >
                 <Text style={styles.menuItemText}>{item.text}</Text>
               </Pressable>
             ))}
           </Animated.View>
         </>
-      )}
+      );
+
+      addPortal(portalIdRef, portalContent);
+    } else {
+      removePortal(portalIdRef);
+    }
+  }, [isVisible, isMenuOpen, menuPosition, itemPosition, itemDimensions, blurAnimRef, scaleAnimRef, itemScaleRef, items, closeMenu, addPortal, removePortal, portalIdRef, children]);
+
+  return (
+    <>
+      {/* Children wrapper - positioned normally within parent, NOT scaled */}
+      <Animated.View
+        style={[
+          isVisible ? { opacity: 0 } : { opacity: 1 },
+        ]}
+      >
+        <Pressable
+          ref={childrenRef}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          onPress={handlePress}
+          hitSlop={hitSlop}
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
     </>
   );
 };
@@ -229,6 +279,7 @@ const styles = StyleSheet.create({
   overlay: {
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
     zIndex: 998,
+    position: 'absolute',
   },
   menuContainer: {
     position: 'absolute',
@@ -241,7 +292,7 @@ const styles = StyleSheet.create({
     elevation: 12,
     overflow: 'hidden',
     minWidth: 150,
-    zIndex: 1000,
+    zIndex: 1002,
   },
   menuItem: {
     paddingHorizontal: 16,

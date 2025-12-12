@@ -1,10 +1,11 @@
+import DayItem from '@/components/edit/Day'
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 const editDay = () => {
   return (
     <View>
-      <Text>edit-day</Text>
+      <DayItem />
     </View>
   )
 }

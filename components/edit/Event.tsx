@@ -1,21 +1,19 @@
-import { Image, StyleSheet, View } from 'react-native'
-import { Pressable, Text, TextInput } from '../../theme/Themed';
-import React from 'react'
-import { Button, Icon, IconButton, Menu, SegmentedButtons, TouchableRipple } from 'react-native-paper';
-import { GestureHandlerRootView} from 'react-native-gesture-handler';
-import { handleAddScheduleEvent, handleDeleteEvent, handleDeleteScheduleEvent, handleModifyEvent, handleModifyScheduleEvent, handleSaveEvent, selectedEventData$ } from '../../utilities/Events';
-import { Switch as Toggle } from 'react-native-paper';
-import { formatDate, openDate$, openTime$ } from '../../utilities/Pickers';
+import { handleAdd, handleDelete, handleModify, selectedSavedEventData$ } from '@/utilities/Saved';
 import { observer, Switch } from '@legendapp/state/react';
-import { stateNavigator } from '../../nav/stateNavigator';
-import { selectedScheduleData$ } from '../../utilities/Schedules';
-import ToggleSwitch from '../sub/ToggleSwitch';
-import { handleAdd, handleDelete, handleModify, selectedSavedEventData$ } from '../../utilities/SEvents';
-import * as ImagePicker from 'expo-image-picker';
-import { firebase } from '../../firebase.config';
-import { ca } from 'react-native-paper-dates';
-import { uploadEventImage } from '../../utilities/ImageUpload'
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import React from 'react';
+import { Image, StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Button, Icon, IconButton, Menu, Switch as Toggle, TouchableRipple } from 'react-native-paper';
+import { firebase } from '../../firebase.config';
+import { Pressable, Text, TextInput } from '../../theme/Themed';
+import { handleAddScheduleEvent, handleDeleteEvent, handleDeleteScheduleEvent, handleModifyEvent, handleModifyScheduleEvent, handleSaveEvent, selectedEventData$ } from '../../utilities/Events';
+import { uploadEventImage } from '../../utilities/ImageUpload';
+import { formatDate, openDate$, openTime$ } from '../../utilities/Pickers';
+import { selectedScheduleData$ } from '../../utilities/Schedules';
+import ToggleSwitch from '../ToggleSwitch';
 
 const formatTime = (selectedTime: Date) => {
     if (!(selectedTime instanceof Date)) {
@@ -338,7 +336,7 @@ const Event = observer(() => {
           {/* <Text> Event Type: {eventType}</Text> */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
           <View style={{flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 10}}>
-          <TouchableRipple onPress={() => stateNavigator.navigateBack(1)} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
+          <TouchableRipple onPress={() => router.back()} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
             <Icon source="chevron-left" size={30}/>
           </TouchableRipple>
           <View style={{flex: 1, height: 50}}>
@@ -438,7 +436,7 @@ const Event = observer(() => {
               onPress={() => {
                 openDate$.case.set('startend-oneday');
                 openDate$.date.set(selectedEventData$.startDate.get());
-                stateNavigator.navigate('calendar');
+                router.navigate('/date')
               }}
             > 
               <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>{formatDate(selectedEventData$.startDate.get())}</Text>
@@ -541,7 +539,7 @@ const Event = observer(() => {
                   handleAddScheduleEvent(selectedScheduleData$.dayIndex.get());
                 }
               }
-              stateNavigator.navigateBack(1);
+                router.back();
             }
             else {
               alert('Event Name required.')
@@ -552,7 +550,7 @@ const Event = observer(() => {
             {selectedEventData$.id.get() &&
             <Button icon='trash-can' style={styles.button} onPress={() => {
               if (eventType === 'pager') {
-                handleDeleteEvent(selectedEventData$.get());
+                handleDeleteEvent(selectedEventData$.get() as any);
               }
               else if (eventType === 'saved') {
                 const newEvent = {
@@ -566,7 +564,7 @@ const Event = observer(() => {
               else if (eventType === 'schedule') {
                 handleDeleteScheduleEvent(selectedScheduleData$.dayIndex.get());
               }
-              stateNavigator.navigateBack(1);
+              router.back();
             }}>
               <Text style={{fontSize: 14, fontWeight: 'bold', textAlign: 'center'}}>Delete</Text>
             </Button>

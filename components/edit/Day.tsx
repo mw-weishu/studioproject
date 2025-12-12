@@ -1,24 +1,15 @@
-import { Keyboard, StyleSheet, View } from 'react-native'
-import React, { useState } from 'react'
-import { GestureHandlerRootView, Pressable, ScrollView, TouchableWithoutFeedback } from 'react-native-gesture-handler';
-import Pager from 'react-native-infinite-pager'
-import { Button, Icon, TouchableRipple } from 'react-native-paper';
-import { Text, TextInput } from '../../theme/Themed';
 import { observer } from '@legendapp/state/react';
-import BlankScheduleEventItem from '../items/empty/BlankScheduleEventItem';
-import ScheduleEventItem from '../items/ScheduleEventItem';
-import { routeState$, stateNavigator } from '../../nav/stateNavigator';
-import { Switch as Toggle } from 'react-native-paper';
-import { configureObservablePersistence, persistObservable } from '@legendapp/state/persist';
-import { ObservablePersistAsyncStorage } from '@legendapp/state/persist-plugins/async-storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { observable } from '@legendapp/state';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Icon, TouchableRipple } from 'react-native-paper';
+import { Text } from '../../theme/Themed';
 // import { FlashList } from '@shopify/flash-list';
+import { onPageChangeInitialIndexState$ } from '@/components/pages/MyPager';
+import { router } from 'expo-router';
+import { ScrollView } from 'react-native-gesture-handler';
 import { filterRepeatingEvents, filterScheduleEvents, getEventsForDate } from '../../utilities/EventsStore';
 import { formatDate } from '../../utilities/Pickers';
 import DayEventItem from '../items/DayEventItem';
-import { onPageChangeInitialIndexState$ } from '../MyPager';
-import { HoldMenuFlatList } from 'react-native-hold-menu';
 
 // Function to format the date key
 const formatDateKey = (date: Date) => {
@@ -136,7 +127,7 @@ const DayItem = observer(() => {
             
           <View style={{ marginHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
           <View style={{flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10}}>
-          <TouchableRipple onPress={() => stateNavigator.navigateBack(1)} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
+          <TouchableRipple onPress={() => router.back()} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
             <Icon source="chevron-left" size={30}/>
           </TouchableRipple>
           <Text style={styles.header}>{title}</Text>
@@ -144,14 +135,23 @@ const DayItem = observer(() => {
           <Text style={styles.header}>{dateTitle}</Text>
           </View>
           
-          <HoldMenuFlatList
+          {/* <FlatList
             data={finalEvents}
             keyExtractor={(item) => `${item.id}-${item.modified}`} // Ensure a unique string key
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <DayEventItem event={item} />
             )}
-          />
+          /> */}
+          <ScrollView
+            keyboardShouldPersistTaps='handled' // to allow keyboard to be dismissed by tapping outside of it
+            >
+            {finalEvents.map((event: any) => (
+              <View key={`${event.id}-${event.modified}`}>
+                <DayEventItem event={event} />
+              </View>
+            ))}
+          </ScrollView>
         </View>
         </View>
       );

@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
+import { PortalHost } from '@/components/PortalHost';
 import { firebase } from '@/firebase.config';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider } from 'react-native-paper';
@@ -70,17 +71,17 @@ function RootLayoutNav({ isSignedIn }: { isSignedIn: boolean }) {
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }}>
         <PaperProvider theme={darkTheme}>
-        <ThemeProvider value={DarkTheme}>
-          
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          
-          <StatusBar 
-            style={'light'} 
-            backgroundColor={'black'}
-          />
-        </ThemeProvider>
+          <PortalHost>
+            <ThemeProvider value={DarkTheme}>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+              <StatusBar 
+                style={'light'} 
+                backgroundColor={'black'}
+              />
+            </ThemeProvider>
+          </PortalHost>
         </PaperProvider>
       </SafeAreaView>
     </SafeAreaProvider>

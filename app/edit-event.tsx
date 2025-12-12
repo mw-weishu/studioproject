@@ -1,12 +1,11 @@
+import Event from '@/components/edit/Event'
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 const editEvent = () => {
   return (
     <View>
-      <Text>editEvent
-    
-      </Text>
+      <Event />
     </View>
   )
 }

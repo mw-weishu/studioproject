@@ -1,10 +1,11 @@
+import Schedule from '@/components/edit/Schedule'
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 const editSchedule = () => {
   return (
     <View>
-      <Text>editSchedule</Text>
+      <Schedule />
     </View>
   )
 }

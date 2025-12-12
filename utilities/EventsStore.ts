@@ -6,6 +6,94 @@ import { ObservablePersistFirebase } from "@legendapp/state/persist-plugins/fire
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { firebase } from '../firebase.config';
+import { selectedRoutineData$ } from './Routines';
+import { selectedScheduleData$ } from './Schedules';
+import { userProfile$ } from './UserProfile';
+
+// ==== TypeScript Types ====
+export type RepeatUnit = 'd' | 'm' | 'y';
+
+export interface RegularRepeatRule {
+  number: number | string;
+  unit: RepeatUnit | string;
+}
+
+export interface WeekdayRuleItem {
+  active: boolean;
+  i: number; // 0-6
+}
+
+export interface WeekdaysRepeatRule {
+  [weekday: string]: WeekdayRuleItem;
+}
+
+export interface RepeatRule {
+  rule: 'regular' | 'weekdays' | string;
+  regular: RegularRepeatRule;
+  weekdays: WeekdaysRepeatRule;
+}
+
+export interface BaseEvent {
+  id: string;
+  title: string;
+  description?: string;
+  eventType?: 'pager' | 'public' | 'routine' | 'saved' | 'schedule';
+  startDate: Date | string;
+  endDate: Date | string;
+  modified?: Date | string;
+}
+
+export interface RepeatingEvent extends BaseEvent {
+  repeatKey: string;
+  repeatRule?: RepeatRule;
+  on?: boolean;
+  starts?: boolean;
+  ends?: boolean;
+  endAfter?: Date | string;
+}
+
+export interface SavedEvent extends BaseEvent {}
+
+export interface Routine {
+  id: string;
+  days: Record<string, BaseEvent[]>;
+}
+
+export interface ScheduleDayEventsMap {
+  [dayIndex: string]: BaseEvent[];
+}
+
+export interface Schedule {
+  id: string;
+  title: string;
+  startDate: Date | string;
+  endDate?: Date | string;
+  on?: boolean;
+  days: ScheduleDayEventsMap;
+  repeatRule?: {
+    regular?: { number: number };
+  };
+}
+
+type EventsByDate = { [dateKey: string]: BaseEvent[] };
+type RepeatingEventsByKey = { [repeatKey: string]: RepeatingEvent[] };
+
+interface PrivateStoreShape {
+  [userId: string]: {
+    events: EventsByDate;
+    repeatingEvents: RepeatingEventsByKey;
+    schedules: Schedule[];
+    savedEvents: SavedEvent[];
+  };
+}
+
+interface PublicStoreShape {
+  [userId: string]: {
+    events: EventsByDate;
+    repeatingEvents: RepeatingEventsByKey;
+    schedules: Schedule[];
+  };
+}
 
 // import { scheduleMultipleNotifications } from './Notifications';
 // import { selectedRoutineData$ } from './Routines';
@@ -13,7 +101,7 @@ import { firebase } from '../firebase.config';
 // import { userProfile$ } from './UserProfile';
 
 // Function to configure persistence
-const configurePersistence = async() => {
+const configurePersistence = async (): Promise<void> => {
     try {
         configureObservablePersistence({
         pluginLocal: ObservablePersistAsyncStorage,
@@ -28,63 +116,50 @@ const configurePersistence = async() => {
     }
   };
 
-export const lastUserId$ = observable('');
-export const lastUserHandle$ = observable('');
+export const lastUserId$ = observable<string>('');
+export const lastUserHandle$ = observable<string>('');
 
-export const public$ = observable({
-  [firebase.auth().currentUser?.uid]: {
-    events: {},
-    repeatingEvents: {},
-    schedules: [],
-  },
-});
+export const public$ = observable<PublicStoreShape>({});
 
-export const private$ = observable({
-  [firebase.auth().currentUser?.uid]: {
-    events: {},
-    repeatingEvents: {},
-    schedules: [],
-    savedEvents: [],
-  },
-});
+export const private$ = observable<PrivateStoreShape>({});
 
-export const PastState$ = observable({});
-export const RepeatPastState$ = observable({});
+export const PastState$ = observable<Record<string, unknown>>({});
+export const RepeatPastState$ = observable<Record<string, unknown>>({});
 
 // Backward-compatible aliases that dynamically access current user's data
 // These allow existing code to continue working without refactoring all at once
-export const events$ = new Proxy({}, {
-  get(target, prop) {
+export const events$ = new Proxy({} as Record<string, any>, {
+  get(target, prop: string) {
     const userId = getCurrentUserId();
-    if (!userId) return prop === 'get' ? () => ({}) : observable({});
+    if (!userId) return prop === 'get' ? () => ({}) : observable<EventsByDate>({});
     if (prop === 'get') {
-      return () => private$[userId]?.events?.get() || {};
+      return (): EventsByDate => private$[userId]?.events?.get() || {};
     }
     // Return the specific dateKey observable
-    return private$[userId]?.events?.[prop] || observable({});
+    return private$[userId]?.events?.[prop] || observable<BaseEvent[]>({} as any);
   }
 });
 
-export const repeatingEvents$ = new Proxy({}, {
-  get(target, prop) {
+export const repeatingEvents$ = new Proxy({} as Record<string, any>, {
+  get(target, prop: string) {
     const userId = getCurrentUserId();
-    if (!userId) return prop === 'get' ? () => ({}) : observable({});
+    if (!userId) return prop === 'get' ? () => ({}) : observable<RepeatingEventsByKey>({});
     if (prop === 'get') {
-      return () => private$[userId]?.repeatingEvents?.get() || {};
+      return (): RepeatingEventsByKey => private$[userId]?.repeatingEvents?.get() || {};
     }
     // Return the specific repeatKey observable
-    return private$[userId]?.repeatingEvents?.[prop] || observable({});
+    return private$[userId]?.repeatingEvents?.[prop] || observable<RepeatingEvent[]>({} as any);
   }
 });
 
 export const schedules$ = {
   schedules: {
-    get: () => {
+    get: (): Schedule[] => {
       const userId = getCurrentUserId();
       if (!userId) return [];
       return private$[userId]?.schedules?.get() || [];
     },
-    set: (value) => {
+    set: (value: Schedule[]) => {
       const userId = getCurrentUserId();
       if (!userId) return;
       private$[userId]?.schedules?.set(value);
@@ -94,51 +169,58 @@ export const schedules$ = {
 
 export const savedEvents$ = {
   events: {
-    get: () => {
+    get: (): SavedEvent[] => {
       const userId = getCurrentUserId();
       if (!userId) return [];
       return private$[userId]?.savedEvents?.get() || [];
     },
-    set: (value) => {
+    set: (value: SavedEvent[]) => {
       const userId = getCurrentUserId();
       if (!userId) return;
       private$[userId]?.savedEvents?.set(value);
     }
+  },
+  routines: {
+    get: (): Routine[] => savedRoutines$.get(),
+    set: (value: Routine[]) => savedRoutines$.set(value),
   }
 };
 
-export const publicEvents$ = new Proxy({}, {
-  get(target, prop) {
+// Separate routines observable to satisfy legacy helpers
+export const savedRoutines$ = observable<Routine[]>([]);
+
+export const publicEvents$ = new Proxy({} as Record<string, unknown>, {
+  get(target, prop: string) {
     const userId = getCurrentUserId();
-    if (!userId) return prop === 'get' ? () => ({}) : observable({});
+    if (!userId) return prop === 'get' ? () => ({}) : observable<EventsByDate>({});
     if (prop === 'get') {
-      return () => public$[userId]?.events?.get() || {};
+      return (): EventsByDate => public$[userId]?.events?.get() || {};
     }
     // Return the specific dateKey observable
-    return public$[userId]?.events?.[prop] || observable({});
+    return public$[userId]?.events?.[prop] || observable<BaseEvent[]>({} as any);
   }
 });
 
-export const publicRepeatingEvents$ = new Proxy({}, {
-  get(target, prop) {
+export const publicRepeatingEvents$ = new Proxy({} as Record<string, unknown>, {
+  get(target, prop: string) {
     const userId = getCurrentUserId();
-    if (!userId) return prop === 'get' ? () => ({}) : observable({});
+    if (!userId) return prop === 'get' ? () => ({}) : observable<RepeatingEventsByKey>({});
     if (prop === 'get') {
-      return () => public$[userId]?.repeatingEvents?.get() || {};
+      return (): RepeatingEventsByKey => public$[userId]?.repeatingEvents?.get() || {};
     }
     // Return the specific repeatKey observable
-    return public$[userId]?.repeatingEvents?.[prop] || observable({});
+    return public$[userId]?.repeatingEvents?.[prop] || observable<RepeatingEvent[]>({} as any);
   }
 });
 
 export const publicSchedules$ = {
   schedules: {
-    get: () => {
+    get: (): Schedule[] => {
       const userId = getCurrentUserId();
       if (!userId) return [];
       return public$[userId]?.schedules?.get() || [];
     },
-    set: (value) => {
+    set: (value: Schedule[]) => {
       const userId = getCurrentUserId();
       if (!userId) return;
       public$[userId]?.schedules?.set(value);
@@ -146,27 +228,28 @@ export const publicSchedules$ = {
   }
 };
 
-export const persistEvents = async (userId) => {
+export const persistEvents = async (userId: string): Promise<void> => {
   try {
     //public
-    // persistObservable(userProfile$[firebase.auth().currentUser?.uid], {
-    //   pluginLocal: ObservablePersistAsyncStorage,
-    //   local: `/profile/${firebase.auth().currentUser?.uid}/`, // Local storage key (unique to the user)
-    //   pluginRemote: ObservablePersistFirebase,
-    //   remote: {
-    //     onSaveError: (err) => console.error(err),
-    //     firebase: {
-    //       refPath: () => `/profiles/${firebase.auth().currentUser?.uid}/`,
-    //       requireAuth: true,
-    //     },
-    //   },
-    // });
-    persistObservable(public$[firebase.auth().currentUser?.uid], {
+    persistObservable(userProfile$[userId], {
+      pluginLocal: ObservablePersistAsyncStorage,
+      local: `/profile/${firebase.auth().currentUser?.uid}/`, // Local storage key (unique to the user)
+      pluginRemote: ObservablePersistFirebase,
+      remote: {
+        onSetError: (err) => console.error(err),
+        firebase: {
+          refPath: () => `/profiles/${firebase.auth().currentUser?.uid}/`,
+          requireAuth: true,
+        },
+      },
+    });
+    if (!userId) return;
+    persistObservable(public$[userId], {
       pluginLocal: ObservablePersistAsyncStorage,
       local: `/public/${firebase.auth().currentUser?.uid}/`,
       pluginRemote: ObservablePersistFirebase,
       remote: {
-        onSaveError: (err) => console.error(err),
+        onSetError: (err: unknown) => console.error(err),
         firebase: {
           refPath: () => `/sharedContent/${firebase.auth().currentUser?.uid}/`,
           requireAuth: true,
@@ -174,12 +257,12 @@ export const persistEvents = async (userId) => {
       },
     });
     //private
-    persistObservable(private$[firebase.auth().currentUser?.uid], {
+    persistObservable(private$[userId], {
       pluginLocal: ObservablePersistAsyncStorage,
       local: `/private/${firebase.auth().currentUser?.uid}/`,
       pluginRemote: ObservablePersistFirebase,
       remote: {
-        onSaveError: (err) => console.error(err),
+        onSetError: (err: unknown) => console.error(err),
         firebase: {
           refPath: () => `/users/${firebase.auth().currentUser?.uid}/`,
           requireAuth: true,
@@ -271,27 +354,36 @@ firebase.auth().onAuthStateChanged(async (user) => {
 });
 
 // Function to format the date key
-export const formatDateKey = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+export const formatDateKey = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${year}${month}${day}`;
 };
 
-export const formatRepeatKey = (ruleObject) => {
-  switch (ruleObject.rule) {
-    case 'regular':
-      const keyString1 = 'every' + ruleObject.regular.number + ruleObject.regular.unit[0];
-      return keyString1;
-    case 'weekdays':
-      let keyString2 = 'weekdays';
-      for (const day in ruleObject.weekdays) {
-        if (ruleObject.weekdays[day].active) {
-          keyString2 = keyString2 + ruleObject.weekdays[day].i;
-        }
-      }
-      return keyString2;
+export const formatRepeatKey = (ruleObject: RepeatRule): string => {
+  const rule = ruleObject.rule === 'regular' || ruleObject.rule === 'weekdays'
+    ? ruleObject.rule
+    : 'regular';
+
+  if (rule === 'regular') {
+    const num = typeof ruleObject.regular.number === 'string'
+      ? parseInt(ruleObject.regular.number, 10)
+      : ruleObject.regular.number;
+    const unitRaw = ruleObject.regular.unit;
+    const unitChar = typeof unitRaw === 'string' ? unitRaw.charAt(0) : unitRaw;
+    const normalizedUnit = unitChar === 'd' ? 'd' : unitChar === 'm' ? 'm' : unitChar === 'y' ? 'y' : 'd';
+    return `every${num}${normalizedUnit}`;
   }
+
+  let keyString2 = 'weekdays';
+  for (const day in ruleObject.weekdays) {
+    if (ruleObject.weekdays[day].active) {
+      keyString2 = keyString2 + ruleObject.weekdays[day].i;
+    }
+  }
+  return keyString2;
 }
 
 // Load persisted JSON directly from AsyncStorage for a set of keys and apply to observables.
@@ -301,11 +393,11 @@ export const formatRepeatKey = (ruleObject) => {
 // read-only initialization (e.g. scheduling) without triggering writes that
 // could overwrite newer remote state when the device reconnects.
 // Helper to get current userId
-const getCurrentUserId = () => {
+const getCurrentUserId = (): string | undefined => {
   return firebase.auth().currentUser?.uid;
 };
 
-export const getLocalPersistedState = async () => {
+export const getLocalPersistedState = async (): Promise<Record<string, unknown> | null> => {
   const keys = {
     events: `events`,
     repeatingEvents: `repeatingEvents`,
@@ -318,7 +410,7 @@ export const getLocalPersistedState = async () => {
     publicSchedules: `publicSchedules`,
   };
 
-  const result = {};
+  const result: Record<string, unknown> = {};
   try {
     for (const [name, key] of Object.entries(keys)) {
       const raw = await AsyncStorage.getItem(key);
@@ -341,17 +433,17 @@ export const getLocalPersistedState = async () => {
   return result;
 };
 
-export const getEventByID = (id) => {
+export const getEventByID = (id: string): BaseEvent | null => {
   const userId = getCurrentUserId();
   if (!userId) return null;
   const dateKey = id.split('-')[0];
   const eventsForDate = private$[userId]?.events?.[dateKey]?.get() || [];
   const event = eventsForDate.find(item => item.id === id);
-  return event;
+  return event ?? null;
 }
 
 // Function to add an event
-export const saveEvent = async(event) => {
+export const saveEvent = async (event: BaseEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const dateKey = formatDateKey(event.startDate);
@@ -375,7 +467,7 @@ export const saveEvent = async(event) => {
 };
 
 // Function to remove an event
-export const deleteEvent = async(event) => {
+export const deleteEvent = async (event: BaseEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   console.log('Deleting event:', event);
@@ -392,7 +484,7 @@ export const deleteEvent = async(event) => {
 };
 
 // Function to update an event
-export const modifyEvent = async(updatedEvent) => {
+export const modifyEvent = async (updatedEvent: BaseEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const dateKey = formatDateKey(updatedEvent.startDate);
@@ -411,7 +503,7 @@ export const modifyEvent = async(updatedEvent) => {
   private$[userId].events[dateKey].set(updatedEventsForDate);
 };
 
-export const getRepeatingEventByID = (id) => {
+export const getRepeatingEventByID = (id: string): RepeatingEvent | null => {
   const userId = getCurrentUserId();
   if (!userId) return null;
   console.log(id);
@@ -420,10 +512,10 @@ export const getRepeatingEventByID = (id) => {
   const eventsForRepeatRule = private$[userId]?.repeatingEvents?.[repeatKey]?.get() || [];
   const event = eventsForRepeatRule.find(item => item.id === id);
   console.log('retuning event: ', event);
-  return event;
+  return event ?? null;
 }
 
-export const saveRepeatingEvent = async(event) => {
+export const saveRepeatingEvent = async (event: RepeatingEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   console.log('event:', event);
@@ -461,7 +553,7 @@ export const saveRepeatingEvent = async(event) => {
 //   repeatingEvents$[repeatKey].set(updatedEvents);
 // }
 
-export const deleteRepeatingEvent = async(event) => {
+export const deleteRepeatingEvent = async (event: RepeatingEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const repeatKey = event.repeatKey;
@@ -472,7 +564,7 @@ export const deleteRepeatingEvent = async(event) => {
   private$[userId].repeatingEvents[repeatKey].set(updatedEvents);
 }
 
-export const addToSavedEvents = async(event) => {
+export const addToSavedEvents = async (event: SavedEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   
@@ -487,7 +579,7 @@ export const addToSavedEvents = async(event) => {
   private$[userId].savedEvents.set(savedEvents);
 };
 
-export const modifySavedEvent = async(updatedEvent) => {
+export const modifySavedEvent = async (updatedEvent: SavedEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const savedEvents = private$[userId]?.savedEvents?.get() || [];
@@ -502,7 +594,7 @@ export const modifySavedEvent = async(updatedEvent) => {
   private$[userId].savedEvents.set(updatedSavedEvents);
 }
 
-export const deleteSavedEvent = async(event) => {
+export const deleteSavedEvent = async (event: SavedEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const savedEvents = private$[userId]?.savedEvents?.get() || [];
@@ -512,123 +604,120 @@ export const deleteSavedEvent = async(event) => {
   private$[userId].savedEvents.set(updatedSavedEvents);
 }
 
-// export const applySavedEvent = async(event, date) => {
-//   const userId = getCurrentUserId();
-//   if (!userId) return;
-//   const newDate = new Date(date);
-//   const newDateKey = formatDateKey(newDate);
+export const applySavedEvent = async(event: SavedEvent, date: Date | string): Promise<void> => {
+  const userId = getCurrentUserId();
+  if (!userId) return;
+  const newDate = new Date(date);
+  const newDateKey = formatDateKey(newDate);
   
-//   // Ensure the userId path exists
-//   if (!private$[userId].get()) {
-//     private$[userId].set({ events: {}, repeatingEvents: {}, schedules: [], savedEvents: [] });
-//   }
-//   if (!private$[userId].events.get()) {
-//     private$[userId].events.set({});
-//   }
+  // Ensure the userId path exists
+  if (!private$[userId].get()) {
+    private$[userId].set({ events: {}, repeatingEvents: {}, schedules: [], savedEvents: [] });
+  }
+  if (!private$[userId].events.get()) {
+    private$[userId].events.set({});
+  }
   
-//   const eventsForDate = private$[userId].events[newDateKey].get() || [];
-//   const startDate = new Date(newDate);
-//   const eventstartDate = new Date(event.startDate);
-//   startDate.setHours(eventstartDate.getHours());
-//   startDate.setMinutes(eventstartDate.getMinutes());
-//   const endDate = new Date(newDate);
-//   const eventendDate = new Date(event.endDate);
-//   endDate.setHours(eventendDate.getHours());
-//   endDate.setMinutes(eventendDate.getMinutes());
-//   // respect midnight
-//   if(endDate.getHours() == 0 && endDate.getMinutes() == 0){
-//     endDate.setDate(endDate.getDate() + 1);
-//   }
-//   const newEvent = {
-//     ...event,
-//     id: getEventID(startDate),
-//     description: event.description || "",
-//     eventType: 'pager',
-//     repeatKey: 'none',
-//     // this prevents first startDate/endDate Date persistence
-//     startDate: startDate,
-//     endDate: endDate,
-//     modified: new Date(),
-//   };
-//   eventsForDate.push(newEvent);
-//   private$[userId].events[newDateKey].set(undefined);
-//   private$[userId].events[newDateKey].set(eventsForDate);
+  const eventsForDate = private$[userId].events[newDateKey].get() || [];
+  const startDate = new Date(newDate);
+  const eventstartDate = new Date(event.startDate);
+  startDate.setHours(eventstartDate.getHours());
+  startDate.setMinutes(eventstartDate.getMinutes());
+  const endDate = new Date(newDate);
+  const eventendDate = new Date(event.endDate);
+  endDate.setHours(eventendDate.getHours());
+  endDate.setMinutes(eventendDate.getMinutes());
+  // respect midnight
+  if(endDate.getHours() == 0 && endDate.getMinutes() == 0){
+    endDate.setDate(endDate.getDate() + 1);
+  }
+  const newEvent: BaseEvent = {
+    ...event,
+    id: getEventID(startDate),
+    description: event.description || "",
+    eventType: 'pager',
+    // this prevents first startDate/endDate Date persistence
+    startDate: startDate,
+    endDate: endDate,
+    modified: new Date(),
+  };
+  eventsForDate.push(newEvent);
+  private$[userId].events[newDateKey].set(undefined);
+  private$[userId].events[newDateKey].set(eventsForDate);
 
-//   scheduleMultipleNotifications();
-// }
+  // scheduleMultipleNotifications();
+}
 
-// export const addToSavedRoutines = async(routine) => {
-//   const savedRoutines = savedEvents$.routines.get() || [];
-//   savedRoutines.push(routine);
-//   savedEvents$.routines.set(undefined);
-//   savedEvents$.routines.set(savedRoutines);
-// }
+export const addToSavedRoutines = async(routine: Routine): Promise<void> => {
+  const savedRoutines = savedEvents$.routines.get() || [];
+  savedRoutines.push(routine);
+  savedEvents$.routines.set([...savedRoutines]);
+}
 
-// export const modifySavedRoutine = async(updatedRoutine) => {
-//   const savedRoutines = savedEvents$.routines.get() || [];
-//   const updatedSavedRoutines = savedRoutines.map(item => {
-//     if (item.id === updatedRoutine.id) {
-//       return updatedRoutine;
-//     }
-//     return item;
-//   });
+export const modifySavedRoutine = async(updatedRoutine: Routine): Promise<void> => {
+  const savedRoutines = savedEvents$.routines.get() || [];
+  const updatedSavedRoutines = savedRoutines.map((item: Routine) => {
+    if (item.id === updatedRoutine.id) {
+      return updatedRoutine;
+    }
+    return item;
+  });
 
-//   savedEvents$.routines.set(undefined);
-//   savedEvents$.routines.set(updatedSavedRoutines);
-// }
+  savedEvents$.routines.set(updatedSavedRoutines);
+}
 
-// export const deleteSavedRoutine = async(routine) => {
-//   const savedRoutines = savedEvents$.routines.get() || [];
+export const deleteSavedRoutine = async(routine: Routine): Promise<void> => {
+  const savedRoutines = savedEvents$.routines.get() || [];
 
-//   const updatedSavedRoutines = savedRoutines.filter(item => {
-//     return item.id !== routine.id;
-//   });
+  const updatedSavedRoutines = savedRoutines.filter((item: Routine) => {
+    return item.id !== routine.id;
+  });
 
-//   savedEvents$.routines.set(undefined);
-//   savedEvents$.routines.set(updatedSavedRoutines);
-// }
+  savedEvents$.routines.set(updatedSavedRoutines);
+}
 
-// export const applySavedRoutine = async(routine, date) => {
-//   for (const day in routine.days) {
-//     const eventsForDay = routine.days[day];
-//     const newDate = new Date(date);
-//     newDate.setDate(newDate.getDate() + (day - 1));
-//     const newDateKey = formatDateKey(newDate);
-//     const eventsForDate = events$[newDateKey].get() || [];
+export const applySavedRoutine = async(routine: Routine, date: Date | string): Promise<void> => {
+  for (const day in routine.days) {
+    const eventsForDay = routine.days[day];
+    const newDate = new Date(date);
+    newDate.setDate(newDate.getDate() + (Number(day) - 1));
+    const newDateKey = formatDateKey(newDate);
+    const dayObservable = events$[newDateKey] as any;
+    const eventsForDate: BaseEvent[] = dayObservable?.get?.() || [];
     
-//     var i = 0;
-//     eventsForDay.forEach(event => {
-//       const startDate = new Date(newDate);
-//       const eventstartDate = new Date(event.startDate);
-//       startDate.setHours(eventstartDate.getHours());
-//       startDate.setMinutes(eventstartDate.getMinutes());
-//       const endDate = new Date(newDate);
-//       const eventendDate = new Date(event.endDate);
-//       endDate.setHours(eventendDate.getHours());
-//       endDate.setMinutes(eventendDate.getMinutes());
-//       // respect midnight
-//       if(endDate.getHours() == 0 && endDate.getMinutes() == 0){
-//         endDate.setDate(endDate.getDate() + 1);
-//       }
-//       const newEvent = {
-//         ...event,
-//         id: getAppliedRoutineEventID(newDate, i),
-//         description: event.description || "",
-//         startDate: startDate,
-//         endDate: endDate,
-//         modified: new Date(),
-//       };
-//       eventsForDate.push(newEvent);
+    var i = 0;
+    eventsForDay.forEach((event: BaseEvent, i) => {
+      const startDate = new Date(newDate);
+      const eventstartDate = new Date(event.startDate);
+      startDate.setHours(eventstartDate.getHours());
+      startDate.setMinutes(eventstartDate.getMinutes());
+      const endDate = new Date(newDate);
+      const eventendDate = new Date(event.endDate);
+      endDate.setHours(eventendDate.getHours());
+      endDate.setMinutes(eventendDate.getMinutes());
+      // respect midnight
+      if(endDate.getHours() == 0 && endDate.getMinutes() == 0){
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      const newEvent: BaseEvent = {
+        ...event,
+        id: getAppliedRoutineEventID(newDate, i),
+        description: event.description || "",
+        startDate: startDate,
+        endDate: endDate,
+        modified: new Date(),
+      };
+      eventsForDate.push(newEvent);
 
-//       scheduleSingleNotification(newEvent.id, newEvent.title, newEvent.description, newEvent.startDate, newEvent.endDate, newEvent.modified);
-//       i++;
-//     });
-//     events$[newDateKey].set(undefined);
-//     events$[newDateKey].set(eventsForDate);
-//   }
-// }
+      // scheduleSingleNotification(newEvent.id, newEvent.title, newEvent.description, newEvent.startDate, newEvent.endDate, newEvent.modified);
+      i++;
+    });
+    dayObservable?.set?.(undefined);
+    dayObservable?.set?.(eventsForDate);
+  }
+}
 
-export const addToPublicEvents = async(event) => {
+export const addToPublicEvents = async (event: BaseEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const dateKey = formatDateKey(event.startDate);
@@ -642,7 +731,7 @@ export const addToPublicEvents = async(event) => {
   }
   
   const eventsForDate = public$[userId].events[dateKey].get() || [];
-  const publicEvent = {
+  const publicEvent: BaseEvent = {
     ...event,
     id: event.id + '-public',
     eventType: 'public',
@@ -652,7 +741,7 @@ export const addToPublicEvents = async(event) => {
   public$[userId].events[dateKey].set(eventsForDate);
 };
 
-export const deletePublicEvent = async(event) => {
+export const deletePublicEvent = async (event: BaseEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const eventID = event.id;
@@ -676,7 +765,7 @@ export const deletePublicEvent = async(event) => {
 //   publicEvents$[dateKey].set(updatedEventsForDate);
 // };
 
-export const addToPublicRepeatingEvents = async(event) => {
+export const addToPublicRepeatingEvents = async (event: RepeatingEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const repeatKey = event.repeatKey;
@@ -695,7 +784,7 @@ export const addToPublicRepeatingEvents = async(event) => {
   public$[userId].repeatingEvents[repeatKey].set(events);
 };
 
-export const deletePublicRepeatingEvent = async(event) => {
+export const deletePublicRepeatingEvent = async (event: RepeatingEvent): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const repeatKey = event.repeatKey;
@@ -705,7 +794,7 @@ export const deletePublicRepeatingEvent = async(event) => {
   public$[userId].repeatingEvents[repeatKey].set(updatedEvents);
 };
 
-export const addToSchedules = async(schedule) => {
+export const addToSchedules = async (schedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   
@@ -720,7 +809,7 @@ export const addToSchedules = async(schedule) => {
   private$[userId].schedules.set(schedules);
 }
 
-export const modifySchedule = async(updatedSchedule) => {
+export const modifySchedule = async (updatedSchedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const schedules = private$[userId]?.schedules?.get() || [];
@@ -735,7 +824,7 @@ export const modifySchedule = async(updatedSchedule) => {
   private$[userId].schedules.set(updatedSchedules);
 }
 
-export const deleteSchedule = async(schedule) => {
+export const deleteSchedule = async (schedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const schedules = private$[userId]?.schedules?.get() || [];
@@ -748,7 +837,7 @@ export const deleteSchedule = async(schedule) => {
   private$[userId].schedules.set(updatedSchedules);
 }
 
-export const addToPublicSchedules = async(schedule) => {
+export const addToPublicSchedules = async (schedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   
@@ -763,7 +852,7 @@ export const addToPublicSchedules = async(schedule) => {
   public$[userId].schedules.set(schedules);
 };
 
-export const modifyPublicSchedule = async(updatedSchedule) => {
+export const modifyPublicSchedule = async (updatedSchedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const schedules = public$[userId]?.schedules?.get() || [];
@@ -778,7 +867,7 @@ export const modifyPublicSchedule = async(updatedSchedule) => {
   public$[userId].schedules.set(updatedSchedules);
 };
 
-export const deletePublicSchedule = async(schedule) => {
+export const deletePublicSchedule = async (schedule: Schedule): Promise<void> => {
   const userId = getCurrentUserId();
   if (!userId) return;
   const schedules = public$[userId]?.schedules?.get() || [];
@@ -787,7 +876,7 @@ export const deletePublicSchedule = async(schedule) => {
   public$[userId].schedules.set(updatedSchedules);
 };
 
-const getAppliedRoutineEventID = (date, reIndex) => {
+const getAppliedRoutineEventID = (date: Date, reIndex: number): string => {
   const userId = getCurrentUserId();
   if (!userId) return '0-0';
   const dateKey = formatDateKey(date);
@@ -809,7 +898,7 @@ const getAppliedRoutineEventID = (date, reIndex) => {
   return newEventID;
 }
 
-export const getEventID = (date) => {
+export const getEventID = (date: Date): string => {
   const userId = getCurrentUserId();
   if (!userId) return '0-0';
   const dateKey = formatDateKey(date);
@@ -831,7 +920,7 @@ export const getEventID = (date) => {
   return newEventID;
 };
 
-export const getRepeatingEventID = (repeatKey) => {
+export const getRepeatingEventID = (repeatKey: string): string => {
   const userId = getCurrentUserId();
   if (!userId) return 'E1D-1';
   const events = private$[userId]?.repeatingEvents?.[repeatKey]?.get() || [];
@@ -860,7 +949,7 @@ export const getRepeatingEventID = (repeatKey) => {
   return newEventID;
 }
 
-export const getSavedEventID = () => {
+export const getSavedEventID = (): string => {
   const userId = getCurrentUserId();
   if (!userId) return 'e1';
   const savedEvents = private$[userId]?.savedEvents?.get() || [];
@@ -879,40 +968,28 @@ export const getSavedEventID = () => {
   return newSavedEventID;
 }
 
-export const getRoutineID = () => {
-  const savedRoutines = savedEvents$.routines.get() || [];
-  const usedIndices = new Set();
+export const getRoutineID = (): string => {
+  // Placeholder generator since routines store is not present
+  return 'r1';
+}
 
-  for (let i = 0; i < savedRoutines.length; i++) {
-    const routineIdParts = savedRoutines[i].id.split('r')
-    const index = parseInt(routineIdParts[1], 10);
+export const getRoutineEventID = (routineId: string, day: number): string => {
+  const days = selectedRoutineData$.get().days[day];
+  const usedIndices = new Set();
+  for (let i = 0; i < days.length; i++) {
+    const eventIdParts = days[i].id.split('-');
+    const index = parseInt(eventIdParts[1], 10);
     usedIndices.add(index);
   }
   let newIndex = 1;
   while (usedIndices.has(newIndex)) {
     newIndex++;
   }
-  const newRoutineID = `r${newIndex}`;
-  return newRoutineID;
-}
+  const newRoutineEventID = `${routineId}d${day}-${newIndex}`;
+  return newRoutineEventID;
+} 
 
-// export const getRoutineEventID = (routineId, day) => {
-//   const days = selectedRoutineData$.get().days[day];
-//   const usedIndices = new Set();
-//   for (let i = 0; i < days.length; i++) {
-//     const eventIdParts = days[i].id.split('-');
-//     const index = parseInt(eventIdParts[1], 10);
-//     usedIndices.add(index);
-//   }
-//   let newIndex = 1;
-//   while (usedIndices.has(newIndex)) {
-//     newIndex++;
-//   }
-//   const newRoutineEventID = `${routineId}d${day}-${newIndex}`;
-//   return newRoutineEventID;
-// } 
-
-export const getScheduleID = () => {
+export const getScheduleID = (): string => {
   const userId = getCurrentUserId();
   if (!userId) return 's1';
   const schedules = private$[userId]?.schedules?.get() || [];
@@ -931,26 +1008,26 @@ export const getScheduleID = () => {
   return newScheduleID;
 }
 
-// export const getScheduleEventID = (scheduleId , day) => {
-//   const days = selectedScheduleData$.get().days[day];
-//   const usedIndices = new Set();
+export const getScheduleEventID = (scheduleId: string , day: number): string => {
+  const days = selectedScheduleData$.get().days[day];
+  const usedIndices = new Set();
 
-//   for (let i = 0; i < days.length; i++) {
-//     const eventIdParts = days[i].id.split('-');
-//     const index = parseInt(eventIdParts[1], 10);
-//     usedIndices.add(index);
-//   }
-//   let newIndex = 1;
-//   while (usedIndices.has(newIndex)) {
-//     newIndex++;
-//   }
-//   const newScheduleEventID = `${scheduleId}d${day}-${newIndex}`;
-//   return newScheduleEventID;
-// }
+  for (let i = 0; i < days.length; i++) {
+    const eventIdParts = days[i].id.split('-');
+    const index = parseInt(eventIdParts[1], 10);
+    usedIndices.add(index);
+  }
+  let newIndex = 1;
+  while (usedIndices.has(newIndex)) {
+    newIndex++;
+  }
+  const newScheduleEventID = `${scheduleId}d${day}-${newIndex}`;
+  return newScheduleEventID;
+}
 
 
 // Getting Repeating Events
-export const filterRepeatingEvents = (dateKey) => {
+export const filterRepeatingEvents = (dateKey: string): BaseEvent[] => {
   const userId = getCurrentUserId();
   if (!userId || !dateKey || dateKey.length !== 8) {
     console.error("Invalid dateKey or no user:", dateKey);
@@ -962,7 +1039,7 @@ export const filterRepeatingEvents = (dateKey) => {
   const day = parseInt(dateKey.slice(6, 8), 10);
   const date = new Date(year, month, day, 0, 0, 0, 0);
 
-  const adjustEventTime = (event) => {
+  const adjustEventTime = (event: RepeatingEvent): BaseEvent => {
     const startDate = new Date(event.startDate);
     const endDate = new Date(event.endDate);
     const adjustedstartDate = new Date(date);
@@ -975,10 +1052,10 @@ export const filterRepeatingEvents = (dateKey) => {
     return { ...event, startDate: adjustedstartDate, endDate: adjustedendDate };
   };
 
-  const repeatingEvents = private$[userId]?.repeatingEvents?.get() || {};
-  const publicRepeatingEvents = public$[userId]?.repeatingEvents?.get() || {};
+  const repeatingEvents = private$[userId]?.repeatingEvents?.get() || {} as RepeatingEventsByKey;
+  const publicRepeatingEvents = public$[userId]?.repeatingEvents?.get() || {} as RepeatingEventsByKey;
   const combinedRepeatingEvents = { ...repeatingEvents, ...publicRepeatingEvents };
-  const filteredEvents = [];
+  const filteredEvents: BaseEvent[] = [];
 
   Object.keys(combinedRepeatingEvents).forEach(key => {
     if (key.startsWith('every')) {
@@ -991,14 +1068,17 @@ export const filterRepeatingEvents = (dateKey) => {
         const compareDate = new Date(year, month, day, 0, 0);
         const startDate = new Date(new Date(event.startDate).getFullYear(), new Date(event.startDate).getMonth(), new Date(event.startDate).getDate(), 0, 0, 0, 0);
         const diffDays = Math.floor((compareDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        const endAfterDate = new Date(new Date(event.endAfter).getFullYear(), new Date(event.endAfter).getMonth(), new Date(event.endAfter).getDate(), new Date(event.endAfter).getHours(), new Date(event.endAfter).getMinutes());
+        const endAfterRaw = event.endAfter ? new Date(event.endAfter) : undefined;
+        const endAfterDate = endAfterRaw
+          ? new Date(endAfterRaw.getFullYear(), endAfterRaw.getMonth(), endAfterRaw.getDate(), endAfterRaw.getHours(), endAfterRaw.getMinutes())
+          : undefined;
         
         // if (event.starts) {
           if (compareDate < startDate) {
             return false;
           }
         // }
-        if (event.ends) {
+        if (event.ends && endAfterDate) {
           if (compareDate > endAfterDate) {
             return false;
           }
@@ -1017,18 +1097,21 @@ export const filterRepeatingEvents = (dateKey) => {
       const weekdays = key.slice(8).split('').map(Number);
       const dayOfWeek = date.getDay();
       if (weekdays.includes(dayOfWeek)) {
-        const events = repeatingEvents[key].filter(event => {
+        const events = (repeatingEvents[key] || []).filter((event: RepeatingEvent) => {
           const compareDate = new Date(year, month, day, 0, 0);
           const startDate = new Date(new Date(event.startDate).getFullYear(), new Date(event.startDate).getMonth(), new Date(event.startDate).getDate(), 0, 0, 0, 0);
           const diffDays = Math.floor((compareDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-          const endAfterDate = new Date(new Date(event.endAfter).getFullYear(), new Date(event.endAfter).getMonth(), new Date(event.endAfter).getDate(), new Date(event.endAfter).getHours(), new Date(event.endAfter).getMinutes());
+          const endAfterRaw = event.endAfter ? new Date(event.endAfter) : undefined;
+          const endAfterDate = endAfterRaw
+            ? new Date(endAfterRaw.getFullYear(), endAfterRaw.getMonth(), endAfterRaw.getDate(), endAfterRaw.getHours(), endAfterRaw.getMinutes())
+            : undefined;
           
           // if (event.starts) {
             if (compareDate < startDate) {
               return false;
             }
           // }
-          if (event.ends) {
+          if (event.ends && endAfterDate) {
             if (compareDate > endAfterDate) {
               return false;
             }
@@ -1043,7 +1126,7 @@ export const filterRepeatingEvents = (dateKey) => {
   return filteredEvents;
 };
 
-export const filterScheduleEvents = (dateKey) => {
+export const filterScheduleEvents = (dateKey: string): BaseEvent[] => {
   const userId = getCurrentUserId();
   if (!userId || !dateKey || dateKey.length !== 8) {
     console.error("Invalid dateKey or no user:", dateKey);
@@ -1055,7 +1138,7 @@ export const filterScheduleEvents = (dateKey) => {
   const day = parseInt(dateKey.slice(6, 8), 10);
   const date = new Date(year, month, day, 0, 0, 0, 0);
 
-  const adjustEventTime = (event) => {
+  const adjustEventTime = (event: BaseEvent): BaseEvent => {
     const startDate = new Date(event.startDate);
     const endDate = new Date(event.endDate);
     const adjustedstartDate = new Date(date);
@@ -1068,10 +1151,10 @@ export const filterScheduleEvents = (dateKey) => {
     return { ...event, startDate: adjustedstartDate, endDate: adjustedendDate };
   };
 
-  const schedules = private$[userId]?.schedules?.get() || [];
-  const publicSchedules = public$[userId]?.schedules?.get() || [];
+  const schedules = private$[userId]?.schedules?.get() || [] as Schedule[];
+  const publicSchedules = public$[userId]?.schedules?.get() || [] as Schedule[];
   const combinedSchedules = [...schedules, ...publicSchedules];
-  const filteredEvents = [];
+  const filteredEvents: BaseEvent[] = [];
 
   combinedSchedules.forEach(schedule => {
     // by default repeat every schedule days length
@@ -1079,7 +1162,7 @@ export const filterScheduleEvents = (dateKey) => {
       // ensure we have a days object to iterate
       const daysObj = schedule.days || {};
       // safe parse for repeat rule, default to 1 day if missing
-      const repeatDaysRule = Number.parseInt(schedule.repeatRule?.regular?.number ?? '1', 10);
+      const repeatDaysRule = Number.parseInt(String(schedule.repeatRule?.regular?.number ?? 1), 10);
 
       Object.keys(daysObj).forEach(key => {
         // ensure the day list is an array before filtering
@@ -1110,7 +1193,7 @@ export const filterScheduleEvents = (dateKey) => {
 };
     
 
-export const getEventsForDate = (dateKey) => {
+export const getEventsForDate = (dateKey: string): BaseEvent[] => {
   const userId = getCurrentUserId();
   if (!userId) return [];
   const events = private$[userId]?.events?.[dateKey]?.get() || [];
@@ -1119,11 +1202,11 @@ export const getEventsForDate = (dateKey) => {
   return [...events, ...publicEvents];
 }
 
-export const getAllRepeatingEvents = () => {
+export const getAllRepeatingEvents = (): RepeatingEvent[] => {
   const userId = getCurrentUserId();
   if (!userId) return [];
-  const allRepeatingEvents = private$[userId]?.repeatingEvents?.get() || {};
-  const allEvents = [];
+  const allRepeatingEvents = private$[userId]?.repeatingEvents?.get() || {} as RepeatingEventsByKey;
+  const allEvents: RepeatingEvent[] = [];
 
   Object.keys(allRepeatingEvents).forEach(key => {
     allEvents.push(...allRepeatingEvents[key]);

@@ -1,56 +1,51 @@
-import { Keyboard, StyleSheet, View } from 'react-native'
-import React from 'react'
-import { GestureHandlerRootView, Pressable, ScrollView, TouchableWithoutFeedback } from 'react-native-gesture-handler';
-import { handleDelete, handleModify, handleSave, selectedScheduleData$, setDefaultScheduleData } from '../../utilities/Schedules';
-import Pager, { InfinitePagerImperativeApi } from 'react-native-infinite-pager'
+import { observable } from '@legendapp/state';
+import { observer } from '@legendapp/state/react';
+import { router } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView, Pressable, ScrollView } from 'react-native-gesture-handler';
+import Pager, { InfinitePagerImperativeApi } from 'react-native-infinite-pager';
 import { Button, Icon, Menu, TouchableRipple } from 'react-native-paper';
 import { Text, TextInput } from '../../theme/Themed';
-import { observer, Switch } from '@legendapp/state/react';
+import { formatDate, openDate$ } from '../../utilities/Pickers';
+import { handleDelete, handleModify, handleSave, selectedScheduleData$, setDefaultScheduleData } from '../../utilities/Schedules';
 import BlankScheduleEventItem from '../items/empty/BlankScheduleEventItem';
 import ScheduleEventItem from '../items/ScheduleEventItem';
-import { routeState$, stateNavigator } from '../../nav/stateNavigator';
-import { Switch as Toggle } from 'react-native-paper';
-import { configureObservablePersistence, persistObservable } from '@legendapp/state/persist';
-import { ObservablePersistAsyncStorage } from '@legendapp/state/persist-plugins/async-storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { observable } from '@legendapp/state';
-import ToggleSwitch from '../sub/ToggleSwitch';
-import { parse } from 'date-fns';
-import { formatDate, openDate$ } from '../../utilities/Pickers';
+import ToggleSwitch from '../ToggleSwitch';
 
-const configurePersistence = async() => {
-    try {
-        configureObservablePersistence({
-        pluginLocal: ObservablePersistAsyncStorage,
-        localOptions: {
-          asyncStorage: {
-            AsyncStorage,
-          },
-        },
-      });
-    } catch (error) {
-      console.error("Error configuring persistence:", error);
-    }
-};
+// const configurePersistence = async() => {
+//     try {
+//         configureObservablePersistence({
+//         pluginLocal: ObservablePersistAsyncStorage,
+//         localOptions: {
+//           asyncStorage: {
+//             AsyncStorage,
+//           },
+//         },
+//       });
+//     } catch (error) {
+//       console.error("Error configuring persistence:", error);
+//     }
+// };
 
 export const initialScheduleIndex$ = observable(0);
 export const onPageChangeInitialScheduleIndexState$ = observable(0);
 
-const persistInitialIndex = async() => {
-  try {
-      persistObservable(initialScheduleIndex$, {
-          local: `initialScheduleIndex`,
-      });
-      persistObservable(onPageChangeInitialScheduleIndexState$, {
-          local: `onPageChangeInitialScheduleIndexState`,
-      });
-  } catch (error) {
-    console.error("Error persisting initialIndex:", error);
-  }
-}
+// const persistInitialIndex = async() => {
+//   try {
+//       persistObservable(initialScheduleIndex$, {
+//           local: `initialScheduleIndex`,
+//       });
+//       persistObservable(onPageChangeInitialScheduleIndexState$, {
+//           local: `onPageChangeInitialScheduleIndexState`,
+//       });
+//   } catch (error) {
+//     console.error("Error persisting initialIndex:", error);
+//   }
+// }
 
-configurePersistence();
-persistInitialIndex();
+// configurePersistence();
+// persistInitialIndex();
 
 const scheduleOnToggle = () => {
   const currentValue = selectedScheduleData$.on.get();
@@ -210,7 +205,7 @@ const Schedule = observer(() => {
         <View style={{ flex: 1}}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 15,}}>
             <View style={{flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 10}}>
-            <TouchableRipple onPress={() => stateNavigator.navigateBack(1)} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
+            <TouchableRipple onPress={() => router.back()} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
               <Icon source="chevron-left" size={30}/>
             </TouchableRipple>
             <View style={{flex: 1, height: 50}}>
@@ -243,7 +238,7 @@ const Schedule = observer(() => {
             <View style={[{ position: 'relative'}, selectedScheduleData$.repeats.get() ? {marginBottom: 400} : {marginBottom: 200}]}>
               <Pager
                 ref={pagerRef}
-                key={routeState$.get()}
+                // key={routeState$.get()}
                 initialIndex={initialScheduleIndex$.get()}
                 minIndex={0}
                 maxIndex={dayslength - 1}
@@ -257,9 +252,8 @@ const Schedule = observer(() => {
                   style={styles.button} 
                   onPress={() => {
                     openDate$.case.set('schedule-start');
-                    openDate$.date.set(selectedScheduleData$.startDate.get()); 
-                    // openDate$.open.set(true);
-                    stateNavigator.navigate('calendar');
+                    openDate$.date.set(selectedScheduleData$.startDate.get());
+                    router.navigate('/date');
                   }}
                 > 
                   <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>{formatDate(selectedScheduleData$.startDate.get())}</Text>
@@ -346,7 +340,7 @@ const Schedule = observer(() => {
                     else {
                     handleSave();
                     }
-                    stateNavigator.navigateBack(1);
+                    router.back();
                     setDefaultScheduleData();
                   }
                   else {
@@ -365,7 +359,7 @@ const Schedule = observer(() => {
               icon='trash-can'
               onPress={() => {
                 handleDelete();
-                stateNavigator.navigateBack(1);
+                router.back();
                 setDefaultScheduleData();
               }}
             >

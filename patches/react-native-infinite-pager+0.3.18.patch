@@ -1,0 +1,79 @@
+diff --git a/node_modules/react-native-infinite-pager/lib/commonjs/pageInterpolators.js b/node_modules/react-native-infinite-pager/lib/commonjs/pageInterpolators.js
+index 9dbdb20..e64f7a6 100644
+--- a/node_modules/react-native-infinite-pager/lib/commonjs/pageInterpolators.js
++++ b/node_modules/react-native-infinite-pager/lib/commonjs/pageInterpolators.js
+@@ -3,11 +3,7 @@
+ Object.defineProperty(exports, "__esModule", {
+   value: true
+ });
+-exports.defaultPageInterpolator = void 0;
+-exports.pageInterpolatorCube = pageInterpolatorCube;
+-exports.pageInterpolatorSlide = pageInterpolatorSlide;
+-exports.pageInterpolatorStack = pageInterpolatorStack;
+-exports.pageInterpolatorTurnIn = pageInterpolatorTurnIn;
++
+ 
+ var _reactNative = require("react-native");
+ 
+@@ -136,3 +132,9 @@ function pageInterpolatorTurnIn({
+ const defaultPageInterpolator = pageInterpolatorSlide;
+ exports.defaultPageInterpolator = defaultPageInterpolator;
+ //# sourceMappingURL=pageInterpolators.js.map
++
++exports.defaultPageInterpolator = void 0;
++exports.pageInterpolatorCube = pageInterpolatorCube;
++exports.pageInterpolatorSlide = pageInterpolatorSlide;
++exports.pageInterpolatorStack = pageInterpolatorStack;
++exports.pageInterpolatorTurnIn = pageInterpolatorTurnIn;
+\ No newline at end of file
+diff --git a/node_modules/react-native-infinite-pager/src/index.tsx b/node_modules/react-native-infinite-pager/src/index.tsx
+index e0bfa4a..e0ca126 100644
+--- a/node_modules/react-native-infinite-pager/src/index.tsx
++++ b/node_modules/react-native-infinite-pager/src/index.tsx
+@@ -1,30 +1,30 @@
+ import React, {
+-  useState,
+-  useImperativeHandle,
+-  useRef,
+   useContext,
+-  useMemo,
+   useEffect,
++  useImperativeHandle,
++  useMemo,
++  useRef,
++  useState,
+ } from "react";
+ import { StyleProp, StyleSheet, ViewStyle } from "react-native";
+-import Animated, {
+-  useAnimatedStyle,
+-  useSharedValue,
+-  withSpring,
+-  useDerivedValue,
+-  useAnimatedReaction,
+-  runOnJS,
+-  WithSpringConfig,
+-  makeMutable,
+-  SharedValue,
+-  DerivedValue,
+-} from "react-native-reanimated";
+ import {
+   ComposedGesture,
+   Gesture,
+   GestureDetector,
+   GestureType,
+ } from "react-native-gesture-handler";
++import Animated, {
++  DerivedValue,
++  makeMutable,
++  runOnJS,
++  SharedValue,
++  useAnimatedReaction,
++  useAnimatedStyle,
++  useDerivedValue,
++  useSharedValue,
++  withSpring,
++  WithSpringConfig,
++} from "react-native-reanimated";
+ import {
+   defaultPageInterpolator,
+   pageInterpolatorCube,
