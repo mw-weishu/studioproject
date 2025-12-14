@@ -3,7 +3,7 @@ import FontAwesome from '@expo/vector-icons/Octicons';
 import { observer } from '@legendapp/state/react';
 import { Stack, Tabs, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Image, Platform, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
@@ -54,6 +54,8 @@ const TabLayout = observer(function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarPosition: Platform.OS === 'web' ? 'left' : 'bottom',
+        tabBarStyle: Platform.OS === 'web' ? {width: 72, minWidth: 72} : {height: 60, paddingTop: 6},
       }}>
       <Tabs.Screen
         name="index"
@@ -123,9 +125,9 @@ export default TabLayout;
 
 const styles = StyleSheet.create({
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     borderWidth: 2,
   },
 });

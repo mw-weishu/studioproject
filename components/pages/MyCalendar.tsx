@@ -1,26 +1,25 @@
-import { NavigationContext } from "navigation-react";
+import { Text, View } from '@/theme/Themed';
+import { onDateConfirm } from "@/utilities/Pickers";
+import { router } from "expo-router";
 import React, {
-    useRef,
-    useState,
+  useRef,
+  useState,
 } from "react";
 import {
-    Platform,
-    StyleSheet,
-    UIManager
+  Platform,
+  StyleSheet,
+  UIManager
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Button } from "react-native-paper";
 import Calendar, { CalendarImperativeApi } from "react-native-swipe-calendar";
-import { Text, View } from '../theme/Themed';
-import { onDateConfirm } from "../utilities/Pickers";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental &&
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function App() {
-  const {stateNavigator} = React.useContext(NavigationContext);
+export default function MyCalendar() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -139,7 +138,7 @@ export default function App() {
       <Button
         mode="contained"
         onPress={() => {
-          stateNavigator.navigateBack(1);
+          router.back();
           
         }}
         style={{ backgroundColor: '#333333' }}
@@ -151,7 +150,7 @@ export default function App() {
         onPress={() => {
           if (selectedDate) {
             onDateConfirm(selectedDate);
-            stateNavigator.navigateBack(1);
+            router.back();
           }
         }}
         disabled={!selectedDate}

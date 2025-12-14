@@ -1,21 +1,43 @@
+import AnimatedIntro from '@/components/AnimatedIntro'
+import BottomLoginSheet from '@/components/BottomLoginSheet'
 import MySaved, { listSelection$ } from '@/components/pages/MySaved'
+import { firebase } from '@/firebase.config'
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import { FAB } from 'react-native-paper'
 
 const saved = () => {
 
-    const [state, setState] = React.useState({ open: false });
-          
-            const onStateChange = ({ open }: { open: boolean }) => setState({ open });
-          
-            const { open } = state;
+  const [isSignedIn, setIsSignedIn] = React.useState(false);
+
+  const [state, setState] = React.useState({ open: false });
+        
+  const onStateChange = ({ open }: { open: boolean }) => setState({ open });
+
+  const { open } = state;
+  
+  React.useEffect(() => {
+    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+      setIsSignedIn(!!user);
+      
+    });
+    return unsubscribe;
+  }, []);
+
+  if (!isSignedIn) {
+    return (
+      <View style={{flex: 1}}>
+        <AnimatedIntro/>
+        <BottomLoginSheet />
+      </View>
+    );
+  }
 
   return (
     <View style={{height: '100%', width: '100%'}}>
       <MySaved />
       <FAB.Group
-          style={{ position: 'absolute', bottom: 60, right: 8, borderRadius: 20}}
+          style={styles.fab}
           fabStyle={{borderRadius: 20, backgroundColor: 'rgba(252, 186, 3, 0.6)'}}
           open={open}
           visible
@@ -76,4 +98,8 @@ const saved = () => {
 
 export default saved
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({
+  fab: Platform.OS === 'web' ? {
+    bottom: -6, right: 8, borderRadius: 20,
+  }: { position: 'absolute', bottom: -30, right: 8, borderRadius: 20},
+})

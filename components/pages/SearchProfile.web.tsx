@@ -89,7 +89,7 @@ const MyProfile = observer(() => {
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, marginHorizontal: 200 }}>
     <View style={{padding: 16}}>
         <TextInput placeholder="Search accounts"
         placeholderTextColor={'gray'} 

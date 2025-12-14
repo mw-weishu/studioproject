@@ -9,7 +9,7 @@ import { StyleSheet, View } from 'react-native';
 
 const ai = () => {
 
-    const [isSignedIn, setIsSignedIn] = React.useState(false);
+  const [isSignedIn, setIsSignedIn] = React.useState(false);
   
   React.useEffect(() => {
     const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
@@ -29,7 +29,7 @@ const ai = () => {
   }
 
   return (
-    <View>
+    <View style={{ flex: 1, height: '100%' }}>
       <MyAI />
     </View>
   )

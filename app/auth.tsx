@@ -1,43 +1,47 @@
 import { useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 // import { defaultStyles } from '../constants/Styles'
 import AnimatedIntro from '@/components/AnimatedIntro';
-import { firebase } from '@/firebase.config';
-import { router } from 'expo-router';
 
-import { TextInput } from 'react-native-paper';
+import AuthResetPassword from '@/components/auth/AuthResetPassword';
+import AuthSignIn from '@/components/auth/AuthSignIn';
+import AuthSignUp from '@/components/auth/AuthSignUp';
 
 
 const Page = () => {
   const { type } = useLocalSearchParams<{type: string}>();
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  
+  // Default to login if no type is provided
+  const authType = type || 'login';
+  
+  // const [loading, setLoading] = useState(false);
+  // const [email, setEmail] = useState('');
+  // const [password, setPassword] = useState('');
 
-  const signIn = async () => {
-    setLoading(true)
-    try {
-      const user = await firebase.auth().signInWithEmailAndPassword(email, password)
-      if (user) router.replace('/(tabs)')
-    } catch (error: any) {
-      console.log(error)
-      alert('Sign in failed: ' + error.message);
-    }
-    setLoading(false)
-  }
+  // const signIn = async () => {
+  //   setLoading(true)
+  //   try {
+  //     const user = await firebase.auth().signInWithEmailAndPassword(email, password)
+  //     if (user) router.replace('/(tabs)')
+  //   } catch (error: any) {
+  //     console.log(error)
+  //     alert('Sign in failed: ' + error.message);
+  //   }
+  //   setLoading(false)
+  // }
 
-  const signUp = async () => {
-    setLoading(true)
-    try {
-      const user = await firebase.auth().createUserWithEmailAndPassword(email, password)
-      if (user) router.replace('/(tabs)')
-    } catch (error: any) {
-      console.log(error)
-      alert('Sign in failed: ' + error.message);
-    }
-    setLoading(false)
-  }
+  // const signUp = async () => {
+  //   setLoading(true)
+  //   try {
+  //     const user = await firebase.auth().createUserWithEmailAndPassword(email, password)
+  //     if (user) router.replace('/(tabs)')
+  //   } catch (error: any) {
+  //     console.log(error)
+  //     alert('Sign in failed: ' + error.message);
+  //   }
+  //   setLoading(false)
+  // }
 
   return (
     <View style={styles.wrapper}>
@@ -47,12 +51,12 @@ const Page = () => {
         style={styles.container}
         keyboardVerticalOffset={1}
       >
-        {loading && (
+        {/* {loading && (
           // <View style={defaultStyles.loadingOverlay}>
           <View>
             <ActivityIndicator size='large' color='#fff'/>
           </View>
-        )}
+        )} */}
         {/* <Image style={styles.logo} source={require('../assets/images/logo-white.png')} /> */}
 
         
@@ -60,36 +64,16 @@ const Page = () => {
 
 
         <View style={styles.auth}>
-          <TextInput 
-        label="Email" 
-        mode='outlined'
-        value={email} 
-        onChangeText={setEmail}
-        // onKeyPress={handleEnterPress}
-        style={{height: 50, width: 300}}
-        />
-      <TextInput 
-        label="Password" 
-        mode='outlined'
-        value={password} 
-        onChangeText={setPassword}
-        // onKeyPress={handleEnterPress}
-        secureTextEntry={true}
-        style={{height: 50, width: 300}}
-        />
-        </View>
-
-        <View style={styles.auth} >
-        {type === 'login' ? (
+        {authType === 'login' ? (
           // <TouchableOpacity onPress={signIn} style={[defaultStyles.btn, styles.btnPrimary]}>
-          <TouchableOpacity onPress={signIn}>
-            <Text style={styles.btnPrimaryText}>Login</Text>
-          </TouchableOpacity>
-        ) : (
+          <AuthSignIn />
+        ) : authType === 'register' ? (
           // <TouchableOpacity onPress={signUp} style={[defaultStyles.btn, styles.btnPrimary]}>
-          <TouchableOpacity onPress={signUp}>
-            <Text style={styles.btnPrimaryText}>Create acount</Text>
-          </TouchableOpacity>
+          <AuthSignUp />
+        ) : authType === 'reset-password' ? (
+          <AuthResetPassword />
+        ) : (
+          <AuthSignIn />
         )}
         </View>
 
@@ -105,11 +89,14 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
-
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    maxHeight: 350,
   },
   wrapper: {
     flex: 1,
     position: 'relative',
+
   },
   container: {
     flex: 1,
@@ -118,6 +105,8 @@ const styles = StyleSheet.create({
     zIndex: 100,
     width: '100%',
     height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logo: {
     width: 60,

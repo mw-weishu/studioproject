@@ -1,8 +1,13 @@
+import { handleDeleteEvent, selectedEventData$, setDefaultEventData, setEventData } from '@/utilities/Events';
+import { openDate$ } from '@/utilities/Pickers';
+import { handleAdd, selectedSavedEventData$ } from '@/utilities/Saved';
+import { setScheduleDataByEventId } from '@/utilities/Schedules';
+import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { View as DefaultView, StyleSheet } from 'react-native';
 import { Icon } from 'react-native-paper';
 import { Pressable, Text, View } from '../../theme/Themed';
-import { addToSavedEvents, deleteEvent } from '../../utilities/EventsStore';
+import { addToPublicEvents, addToSavedEvents, deleteEvent } from '../../utilities/EventsStore';
 import { HoldItem } from '../HoldItem';
 import PagerEventTimeSlide from './PagerEventTimeSlide';
 
@@ -146,11 +151,70 @@ const Item = (eventProps: ItemProps) => {
   //Render count
   const renderCount = React.useRef(1).current++;
   const {event} = eventProps;
-  const MenuItems = React.useMemo(() => createMenuItems(event), [event.id]);
+
+  const BlankItems = [
+      { text: 'Create', icon: 'plus-square', onPress: () => {
+        setDefaultEventData(event);
+        router.navigate('/edit-event');
+      }},
+    ];
+  
+    const EventItems = [
+      // { text: 'Actions', icon: 'home', isTitle: true, onPress: () => {} },
+      { text: 'Edit', icon: 'edit', onPress: () => {
+        setEventData(event);
+        router.navigate('/edit-event');
+      }},
+      { text: 'Copy to Dates', icon: 'calendar', onPress: () => {
+        selectedSavedEventData$.set({
+          ...event,
+          startDate: event.startDate,
+          endDate: event.endDate,
+        });
+        openDate$.case.set('saved-event-apply');
+        router.navigate('/date');
+      }},
+      { text: 'Add to Saved', icon: 'save', withSeparator: true, onPress: () => {
+        selectedSavedEventData$.set(event);
+        handleAdd();
+      }},
+      { text: 'Add to Public', icon: 'share', onPress: () => {
+        addToPublicEvents(event);
+      }},
+      { text: 'Delete', icon: 'trash', isDestructive: true, onPress: () => {
+        // console.log('event type: ', event.eventType);
+        selectedEventData$.set(event);
+        handleDeleteEvent(event);
+      }},
+    ];
+  
+    const ScheduleEventItems = [
+      // { text: 'Actions', icon: 'home', isTitle: true, onPress: () => {} },
+      { text: 'Edit Schedule', icon: 'edit', onPress: () => {
+        setScheduleDataByEventId(event.id);
+        router.navigate('/edit-schedule');
+      }},
+      { text: 'Add to Saved', icon: 'save', withSeparator: true, onPress: () => {
+        addToSavedEvents(event);
+      }},
+      // { text: 'Delete', icon: 'trash', isDestructive: true, onPress: () => {
+      //   // console.log('event type: ', event.eventType);
+      //   setScheduleDataByEventId(event.id);
+        
+      //   selectedEventData$.id.set(event.id);
+      //   handleDeleteScheduleEvent(selectedScheduleData$.dayIndex.get());
+      // }},
+    ];
   
   return (
       <HoldItem
-      items={MenuItems}
+      items={
+        event.blank
+          ? BlankItems
+          : event.eventType === 'schedule'
+          ? ScheduleEventItems
+          : EventItems
+      }
       activateOn='tap'
       >
       <View>

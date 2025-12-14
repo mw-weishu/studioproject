@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
   GestureResponderEvent,
   Pressable,
@@ -54,10 +55,21 @@ export const HoldItem = ({
         setItemDimensions({ width, height });
         setItemPosition({ x: pageX, y: pageY });
         
-        // Menu positioned below the item
+        // Get window height to detect if menu would go off-screen
+        const windowHeight = Dimensions.get('window').height;
+        const menuHeight = items.length * 48 + 8; // Approximate menu height (48px per item + padding)
+        const spaceBelow = windowHeight - (pageY + height);
+        const spaceAbove = pageY;
+        
+        // Position menu below by default, but above if not enough space
+        let calculatedY = pageY + height + 4;
+        if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
+          calculatedY = pageY - menuHeight - 4; // Position above item
+        }
+        
         setMenuPosition({
           x: pageX + width / 2,
-          y: pageY + height + 4, // Small gap between item and menu
+          y: calculatedY,
         });
         setIsVisible(true);
         setIsMenuOpen(true);

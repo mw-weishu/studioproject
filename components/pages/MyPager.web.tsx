@@ -12,7 +12,10 @@ import { observable } from '@legendapp/state';
 // import { formatDate } from '../utilities/Pickers';
 // import { routeState$, stateNavigator } from '../nav/stateNavigator';
 // import { set } from 'date-fns';
-import Calendar, { CalendarImperativeApi } from 'react-native-swipe-calendar';
+import { pagerDateData$ } from '@/utilities/Events';
+import { Icon } from 'react-native-paper';
+import { interpolate } from 'react-native-reanimated';
+import Calendar, { CalendarImperativeApi, CalendarPageInterpolatorParams } from 'react-native-swipe-calendar';
 // import { setDefaultScheduleData } from '../utilities/Schedules';
 // import { initialScheduleIndex$ } from './edit/Schedule';
 
@@ -20,6 +23,32 @@ const formatDate = (date: Date) => {
   const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString(undefined, options);
 };
+
+// Example
+function pageInterpolator({ focusAnim }: CalendarPageInterpolatorParams) {
+  "worklet"
+  
+  const inputRange = [-1, 0, 1]
+  
+  // Ensure the current month has a higher zIndex than the surrounding months
+  const zIndex = interpolate(focusAnim.value, inputRange, [0, 99, 0])
+  
+  // Fade the current month as it enters/leaves focus
+  const opacity = interpolate(focusAnim.value, inputRange, [0, 1, 0])
+  
+  // Rotate the current month as it leaves focus
+  const rotationDeg = interpolate(focusAnim.value, inputRange, [360, 0, 0])
+  
+  // Scale up the incoming month
+  const scale = interpolate(focusAnim.value, inputRange, [2, 1, 0.25])
+  
+  return {
+    opacity,
+    zIndex,
+    transform: [{ rotate: `${rotationDeg}deg` }, { scale }]
+  }
+}
+
 
 const calendarIndexDate$ = observable(new Date());
 
@@ -197,7 +226,7 @@ const CarouselPage = ({ index }: { index: number }) => {
         <Pressable onPress={() => {
           // stateNavigator.navigate('edit-day')
         }} 
-          style={{ marginHorizontal: 16, paddingVertical: 10, borderRadius: 25, backgroundColor: 'rgba(69, 69, 120, 0.6)'}}>
+          style={{marginHorizontal: 16, paddingVertical: 10, borderRadius: 25, backgroundColor: 'rgba(69, 69, 120, 0.6)', height: '100%', display: 'flex', flexDirection: 'column'}}>
         <View style={styles.slide}>
 
           <View style={{ marginHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
@@ -215,6 +244,10 @@ const CarouselPage = ({ index }: { index: number }) => {
             maxToRenderPerBatch={5}
             windowSize={10}
             getItemLayout={undefined}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            style={{ flex: 1, minHeight: 0 }}
+            contentContainerStyle={{ flexGrow: 1 }}
             renderItem={({ item }) => (
               <PagerItem event={item} />
             )}
@@ -289,30 +322,30 @@ const MyPager = observer(() => {
     
   
     const onPageChange = (index: number) => {
-      // const newStartDate = new Date(new Date().setDate(new Date().getDate() + index));
-      // newStartDate.setHours(0, 0, 0, 0);
-      // pagerDateData$.baseStartDate.set(newStartDate);
-      // const oldStartDate = pagerDateData$.currentScreenStartDate.get();
-      // pagerDateData$.currentScreenStartDate.set(newStartDate);
-      // const newEndDate = new Date(new Date().setDate(new Date().getDate() + index + 1));
-      // newEndDate.setHours(0, 0, 0, 0);
-      // pagerDateData$.baseEndDate.set(newEndDate);
-      // pagerDateData$.currentScreenEndDate.set(newEndDate);
+      const newStartDate = new Date(new Date().setDate(new Date().getDate() + index));
+      newStartDate.setHours(0, 0, 0, 0);
+      pagerDateData$.baseStartDate.set(newStartDate);
+      const oldStartDate = pagerDateData$.currentScreenStartDate.get();
+      pagerDateData$.currentScreenStartDate.set(newStartDate);
+      const newEndDate = new Date(new Date().setDate(new Date().getDate() + index + 1));
+      newEndDate.setHours(0, 0, 0, 0);
+      pagerDateData$.baseEndDate.set(newEndDate);
+      pagerDateData$.currentScreenEndDate.set(newEndDate);
 
-      // onPageChangeInitialIndexState$.set(index);
+      onPageChangeInitialIndexState$.set(index);
 
-      // // If this page change was initiated by the calendar (user tapped a day),
-      // // don't clear the selected date here. The calendar initiated the change
-      // // and will keep selection as appropriate.
-      // if (suppressSetSelectedDate.current) {
-      //   suppressSetSelectedDate.current = false;
-      // } else {
-      //   setSelectedDate(new Date(new Date().setDate(new Date().getDate() + index)));
+      // If this page change was initiated by the calendar (user tapped a day),
+      // don't clear the selected date here. The calendar initiated the change
+      // and will keep selection as appropriate.
+      if (suppressSetSelectedDate.current) {
+        suppressSetSelectedDate.current = false;
+      } else {
+        setSelectedDate(new Date(new Date().setDate(new Date().getDate() + index)));
 
-      //   if (suppressFirstTime.current < 1) {
-      //     suppressFirstTime.current += 1;
-      //     return;
-      //   }
+        if (suppressFirstTime.current < 1) {
+          suppressFirstTime.current += 1;
+          return;
+        }
       //   else {
       //     // if (selectedDate) {
       //     //   console.log('aaaaasssss', selectedDate)
@@ -338,7 +371,7 @@ const MyPager = observer(() => {
       //       calendarRef.current?.incrementPage({ animated: true });
       //     }
       //   }
-      // } 
+      } 
 
       
     }
@@ -346,10 +379,29 @@ const MyPager = observer(() => {
     
 
     return (
-    <GestureHandlerRootView>
+    <GestureHandlerRootView style={{ height: '100%'}}>
+      
+    <View style={{flexDirection: 'row', height: '100%',}}>
+        <Pressable onPress={handleDecrement}
+        style={{ flex: .5, backgroundColor: 'black', opacity: 0.3, zIndex: 100}}/>
+      <Pager
+        ref={pagerRef}
+        style={styles.pager}
+        renderPage={CarouselPage}
+        vertical={false}
+        initialIndex={initialIndex$.get()}
+        onPageChange={(index: number) => onPageChange(index)}
+        preset={preset}
+        pageWrapperStyle={{width: '100%', height: '100%'}}
+      />
+      <Pressable onPress={handleIncrement}
+        style={{ flex: .5,  backgroundColor: 'black', opacity: 0.3}}/>
+      <View style={{ height: '100%', width: 300, backgroundColor: 'black'}}>
       <Calendar
+        gesturesDisabled={true}
+            pageInterpolator={pageInterpolator}
         theme={{ 
-          todayIndicatorDotColor: 'royalblue',
+          todayIndicatorDotColor: 'cyan',
           headerFontColor: 'white',
           dayLabelColor: 'white',
           dayFontColor: 'white',
@@ -364,12 +416,20 @@ const MyPager = observer(() => {
         //     null
         //   );
         // }}
-        pageInterval='week'
+        
+        pageInterval='month'
         // WeekComponent={({ days }) => {
         //   return (
-        //     <View style={{ height: 50, flexDirection: 'row', justifyContent: 'space-between', padding: 16}}>
+        //     <View style={{height: '100%', flexDirection: 'row', justifyContent: 'space-around'}}>
         //       {days.map((day, index) => (
-        //         <TouchableRipple key={index} onPress={() => void 0}>
+        //         <TouchableRipple key={index} onPress={() => {
+        //             // on day press, set selected date and update pager
+        //             setSelectedDate(day);
+        //             suppressSetSelectedDate.current = true;
+        //             const index = dayIndexFromToday(new Date(day));
+        //             pagerRef.current?.setPage(index, { animated: Math.abs(index - onPageChangeInitialIndexState$.get()) === 1 ? true : false });
+        //             }}
+        //             >
         //           <View style={{ flex: 1, alignItems: 'center' }}>
         //             <Text style={{ color: 'white' }}>{day.getDate()}</Text>
         //           </View>
@@ -377,6 +437,57 @@ const MyPager = observer(() => {
         //       ))}
         //     </View>
         //   );
+        // }}
+        
+        // DayLabelComponent={({date}: { date: Date }) => {
+        //     return (
+        //         null
+        //     );
+        // }}
+        // MonthComponent={({ weeks }: { weeks: Date[][] }) => {
+        //     const isToday = (date: Date) => {
+        //         const today = new Date();
+        //         return date.getDate() === today.getDate() &&
+        //                date.getMonth() === today.getMonth() &&
+        //                date.getFullYear() === today.getFullYear();
+        //     }
+        //     return (
+        //         <ScrollView style={{gap: 8, paddingVertical: 8 }}>
+        //             {weeks.map((week, index) => (
+        //                 <View key={index} style={{flexDirection: 'column', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+        //                     {week.map((day, dayIndex) => (
+        //                     <View key={dayIndex} style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 4 }}>
+        //                         {isToday(day) ? 
+        //                         <Pressable key={dayIndex} onPress={() => 
+        //                         {
+        //                             // on day press, set selected date and update pager
+        //                             setSelectedDate(day);
+        //                             suppressSetSelectedDate.current = true;
+        //                             const index = dayIndexFromToday(new Date(day));
+        //                             pagerRef.current?.setPage(index, { animated: Math.abs(index - onPageChangeInitialIndexState$.get()) === 1 ? true : false });
+        //                         }
+        //                         } style={{ flex: 1, alignItems: 'center', borderRadius: 20, backgroundColor: 'rgba(255, 255, 255, 0.3)', paddingHorizontal: 6, paddingVertical: 2 }}>
+        //                             <Text style={{ color: 'white', fontWeight: 'bold' }}>{day.getDate()}</Text>
+        //                         </Pressable>
+        //                         :
+        //                         <Pressable key={dayIndex} onPress={() => 
+        //                         {
+        //                             // on day press, set selected date and update pager
+        //                             setSelectedDate(day);
+        //                             suppressSetSelectedDate.current = true;
+        //                             const index = dayIndexFromToday(new Date(day));
+        //                             pagerRef.current?.setPage(index, { animated: Math.abs(index - onPageChangeInitialIndexState$.get()) === 1 ? true : false });
+        //                         }
+        //                         } style={{ flex: 1, alignItems: 'center' }}>
+        //                             <Text style={{ color: 'white' }}>{day.getDate()}</Text>
+        //                         </Pressable>
+        //                     }
+        //                     </View>
+        //                     ))}
+        //                 </View>
+        //             ))}
+        //         </ScrollView>
+        //     );
         // }}
         weekStartsOn={1}
         ref={calendarRef}
@@ -389,7 +500,7 @@ const MyPager = observer(() => {
           suppressSetSelectedDate.current = true;
           // compute page index robustly using UTC midnights to avoid DST/timezone shifts
           const index = dayIndexFromToday(new Date(date));
-          pagerRef.current?.setPage(index, { animated: Math.abs(index - onPageChangeInitialIndexState$.get()) === 1 ? true : false });
+          pagerRef.current?.setPage(index, { animated: true});
         }}
         selectedDate={selectedDate}
         onPageChange={(date: any) => {
@@ -400,19 +511,10 @@ const MyPager = observer(() => {
 
         }}
       />
-      <View style={{height: 10}}>
-        {/* <Text>{suppressFirstTime.current}</Text> */}
-      </View>
-
-      <Pager
-        ref={pagerRef}
-        style={styles.pager}
-        renderPage={CarouselPage}
-        vertical={false}
-        initialIndex={initialIndex$.get()}
-        onPageChange={(index: number) => onPageChange(index)}
-        preset={preset}
-      />
+      
+        </View>
+        <View style={{ flex: .1, backgroundColor: 'black', zIndex: 100}}/>
+    </View>
 
         {/* <Pressable style={[styles.dec, { top: screenData.height * 0.45 }]} onPress={() => handleIncrement()}>
           <Icon source="chevron-right" size={24} />
@@ -420,11 +522,11 @@ const MyPager = observer(() => {
         <Pressable style={[styles.inc, { top: screenData.height * 0.45 }]} onPress={() => handleDecrement()}>
           <Icon source="chevron-left" size={24} />
         </Pressable> */}
-        {/* {goToTodayVisible ? 
+        {goToTodayVisible ? 
         <Pressable style={styles.goToToday} onPress={() => {
           if (pagerRef.current) {
-            pagerRef.current.setPage(0, { animated: false }); // can change this depending on if difference is equal to 1
-            calendarRef.current?.setPage(new Date(), { animated: false });
+            pagerRef.current.setPage(0, { animated: true }); // can change this depending on if difference is equal to 1
+            calendarRef.current?.setPage(new Date(), { animated: true });
           }
         }}>
           <Text style={{fontSize: 16, fontWeight: 'bold'}}>Go to Today</Text>
@@ -432,7 +534,7 @@ const MyPager = observer(() => {
         </Pressable>
         :
          null
-        } */}
+        }
     </GestureHandlerRootView>
     );
 });
@@ -465,7 +567,7 @@ const styles = StyleSheet.create({
     },
     goToToday: {
       position: 'absolute',
-      bottom: 70,
+      bottom: 10,
       left: 20,
       height: 40,
       backgroundColor: "rgba(255, 255, 255, 0.4)",
@@ -477,6 +579,8 @@ const styles = StyleSheet.create({
     },
     slide: {
       height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
     },
     header: {
       fontSize: 20,

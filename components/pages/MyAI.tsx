@@ -3,7 +3,8 @@ import { GEMINI_API_KEY, GEMINI_API_URL } from '@/firebase.config'
 import { Text, View } from '@/theme/Themed'
 import React from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput } from 'react-native'
-import { IconButton, SegmentedButtons } from 'react-native-paper'
+import { IconButton } from 'react-native-paper'
+import SegmentedControl from '../SegmentedControl'
 
 interface Message {
   role: 'user' | 'ai';
@@ -12,14 +13,20 @@ interface Message {
 }
 
 const MyAI = () => {
-  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [chatMessages, setChatMessages] = React.useState<Message[]>([]);
+  const [eventMessages, setEventMessages] = React.useState<Message[]>([]);
   const [input, setInput] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [streamingText, setStreamingText] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
-  const [mode, setMode] = React.useState<'chat' | 'event'>('chat');
+  const [modeIndex, setModeIndex] = React.useState(0); // 0 = event, 1 = chat
+  const mode = modeIndex === 0 ? 'event' : 'chat';
   const [generatedEvent, setGeneratedEvent] = React.useState<any | null>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
+
+  // Get current messages based on mode
+  const messages = mode === 'chat' ? chatMessages : eventMessages;
+  const setMessages = mode === 'chat' ? setChatMessages : setEventMessages;
 
   const extractJSON = (text: string) => {
     try {
@@ -344,20 +351,26 @@ Prompt: ${currentInput}`,
 
   return (
     <View style={styles.container}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <SegmentedButtons
-          value={mode}
-          onValueChange={(v: any) => setMode(v)}
-          buttons={[
-            { value: 'chat', label: 'Chat', icon: 'chat' },
-            { value: 'event', label: 'Create Event', icon: 'calendar-plus' },
+      <View style={{ paddingHorizontal: 16, paddingTop: 8, justifyContent: 'center', alignItems: 'center' }}>
+        <SegmentedControl
+          tabs={[
+            { icon: 'calendar-plus', tab: 'Create Event' },
+            { icon: 'chat', tab: 'Chat' },
           ]}
+          currentIndex={modeIndex}
+          onChange={(index: number) => setModeIndex(index)}
+          segmentedControlBackgroundColor='rgb(69, 69, 112)'
+          activeSegmentBackgroundColor='goldenrod'
+          activeTextColor='white'
+          textColor='white'
+          width='100%'
         />
       </View>
       <ScrollView 
         ref={scrollViewRef}
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
+        scrollEnabled={true}
       >
         {messages.length === 0 ? (
           <View style={styles.emptyState}>
@@ -404,8 +417,9 @@ Prompt: ${currentInput}`,
             <DayEventItem event={generatedEvent} />
           </View>
         )}
+      </ScrollView>
 
-        <View style={styles.inputContainer}>
+      <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           value={input}
@@ -424,9 +438,6 @@ Prompt: ${currentInput}`,
           disabled={!input.trim() || loading}
         />
       </View>
-      </ScrollView>
-
-      
     </View>
   )
 }
@@ -435,16 +446,17 @@ export default MyAI
 
 const styles = StyleSheet.create({
     container: {
-        height: '100%',
+        flex: 1,
         width: '100%',
-        justifyContent: 'space-between',
+        position: 'relative',
     },
     messagesContainer: {
         flex: 1,
+        minHeight: 0,
     },
     messagesContent: {
         padding: 16,
-        paddingBottom: 100,
+        paddingBottom: 80,
     },
     emptyState: {
         flex: 1,
@@ -502,8 +514,9 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         paddingHorizontal: 16,
         paddingVertical: 8,
+        paddingBottom: 16,
         backgroundColor: 'rgb(40, 40, 60)',
-        zIndex: 10,
+        zIndex: 100,
     },
     input: {
         flex: 1,

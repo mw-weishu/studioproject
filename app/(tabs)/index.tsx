@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 // import EditScreenInfo from '@/components/EditScreenInfo';
 // import { Text, View } from '@/components/Themed';
@@ -33,6 +33,12 @@ const formatTime = (dateString: string) => {
 const TabOneScreen = observer(() => {
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
+  const [state, setState] = React.useState({ open: false });
+    
+  const onStateChange = ({ open }: { open: boolean }) => setState({ open });
+
+  const { open } = state;
+
   React.useEffect(() => {
     const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
       setIsSignedIn(!!user);
@@ -40,12 +46,6 @@ const TabOneScreen = observer(() => {
     });
     return unsubscribe;
   }, []);
-
-  const [state, setState] = React.useState({ open: false });
-    
-      const onStateChange = ({ open }: { open: boolean }) => setState({ open });
-    
-      const { open } = state;
 
   if (!isSignedIn) {
     return (
@@ -55,12 +55,13 @@ const TabOneScreen = observer(() => {
       </View>
     );
   }
+
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View style={{ maxWidth: 500, height: "100%", width: '100%' }}>
+      <View style={{ height: '100%', width: '100%' }}>
       <MyPager />
       <FAB.Group
-                style={{bottom: -6, right: 8, borderRadius: 20,}}
+                style={styles.fab}
                 fabStyle={{borderRadius: 20, backgroundColor: 'rgba(252, 186, 3, 0.6)'}}
                 open={open}
                 visible
@@ -96,6 +97,9 @@ const TabOneScreen = observer(() => {
 
 export default TabOneScreen;
 const styles = StyleSheet.create({
+  fab: Platform.OS === 'web' ? {
+    bottom: -6, right: 8, borderRadius: 20,
+  }: { bottom: -30, right: 8, borderRadius: 20},
   container: {
     width: '100%',
     height: '100%',

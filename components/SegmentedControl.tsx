@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Icon, TouchableRipple } from 'react-native-paper';
 
 interface Tab {
@@ -16,6 +16,7 @@ interface SegmentedControlProps {
   textColor?: string;
   activeTextColor?: string;
   paddingVertical?: number;
+  width?: number | `${number}%` | 'auto'; // allow callers to constrain width (e.g., 100% in a centered column)
 }
 
 const shadow = {
@@ -30,22 +31,33 @@ const shadow = {
   elevation: 4,
 }
 
-// So that it stretches in landscape mode.
-const width = Dimensions.get('screen').width - 32;
-
 const SegmentedControl = (props: SegmentedControlProps) => {
-  const translateValue = ((width - 4) / props.tabs.length);
-  const [tabTranslate, setTabTranslate] = React.useState(new Animated.Value(0));
+  const width = props.width ?? '100%';
+  const widthStyle = typeof width === 'number' ? { width } : { width };
+  const [measuredWidth, setMeasuredWidth] = React.useState<number | null>(null);
+  const containerWidth = typeof width === 'number'
+    ? width
+    : measuredWidth ?? Dimensions.get('screen').width - 32;
+  const translateValue = containerWidth ? ((containerWidth - 4) / props.tabs.length) : 0;
+  const [tabTranslate] = React.useState(new Animated.Value(0));
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    if (typeof width === 'string') {
+      const nextWidth = event.nativeEvent.layout.width;
+      setMeasuredWidth((prev) => (prev === nextWidth ? prev : nextWidth));
+    }
+  };
 
   // useCallBack with an empty array as input, which will call inner lambda only once and memoize the reference for future calls
   const memoizedTabPressCallback = React.useCallback(
     (index: number) => {
       props?.onChange(index);
     },
-    []
+    [props?.onChange]
   );
 
   useEffect(() => {
+    if (!translateValue) return;
     // Animating the active index based current index
     Animated.spring(tabTranslate, {
       toValue: props?.currentIndex * translateValue,
@@ -54,7 +66,7 @@ const SegmentedControl = (props: SegmentedControlProps) => {
       mass: 1,
       useNativeDriver: true
     }).start()
-  }, [props?.currentIndex])
+  }, [props?.currentIndex, translateValue, tabTranslate])
 
   return (
     <Animated.View style={[
@@ -62,15 +74,16 @@ const SegmentedControl = (props: SegmentedControlProps) => {
       {
         backgroundColor: props?.segmentedControlBackgroundColor
       },
+      widthStyle,
     //   {
     //     paddingVertical: props?.paddingVertical,
     //   }
-    ]}>
+    ]} onLayout={handleLayout}>
       <Animated.View
         style={[{
           ...StyleSheet.absoluteFillObject,
           position: "absolute",
-          width: (width - 4) / props?.tabs?.length,
+          width: containerWidth ? (containerWidth - 4) / props?.tabs?.length : 0,
           height: '100%',
           top: 0,
           backgroundColor: props?.activeSegmentBackgroundColor,
@@ -87,7 +100,7 @@ const SegmentedControl = (props: SegmentedControlProps) => {
       >
       </Animated.View>
       {
-        props?.tabs.map(({icon, tab}: {icon: string, tab: string}, index: any) => {
+        props?.tabs.map(({icon, tab}: {icon: string, tab: string}, index: number) => {
           const isCurrentIndex = props?.currentIndex === index;
           return (
             <TouchableRipple
@@ -114,7 +127,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 8,
-    width: width,
     margin: 4,
   },
   textWrapper: {

@@ -1,10 +1,11 @@
+import MyCalendar from '@/components/pages/MyCalendar'
 import React from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 
 const date = () => {
   return (
     <View>
-      <Text>date</Text>
+      <MyCalendar />
     </View>
   )
 }
