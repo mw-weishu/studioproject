@@ -11,14 +11,13 @@ import { Platform } from 'react-native';
 // web app's Firebase configuration
 // web allows for cross-platform compatibility
 const firebaseConfig = {
-    apiKey: "AIzaSyBjkXNxLsgJm0ZFmfyHs16EspmSd96_-2k",
-    authDomain: "app-routime.firebaseapp.com",
-    databaseURL: "https://app-routime-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "app-routime",
-    storageBucket: "app-routime.firebasestorage.app",
-    messagingSenderId: "445843597034",
-    appId: "1:445843597034:web:17e64974e08a1a9c4bd993",
-    measurementId: "G-WGSMWKHYMY"
+  apiKey: "AIzaSyAPn0zqhWOl7sNtQyvw6Mbn8SXxGxCMPFo",
+  authDomain: "expo-routime.firebaseapp.com",
+  projectId: "expo-routime",
+  storageBucket: "expo-routime.firebasestorage.app",
+  messagingSenderId: "1062592796578",
+  appId: "1:1062592796578:web:d652855860684fe79c44fb",
+  measurementId: "G-E0QZBWNCQ7"
 };
 
 function requestPermission() {
