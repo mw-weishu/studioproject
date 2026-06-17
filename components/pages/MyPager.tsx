@@ -1,485 +1,215 @@
-import { Pressable, Text, View } from '@/theme/Themed';
-import { filterRepeatingEvents, filterScheduleEvents, getEventsForDate } from '@/utilities/EventsStore';
-import { observer } from '@legendapp/state/react';
-import React, { useEffect, useState } from 'react';
-import { Dimensions, Platform, StyleSheet } from 'react-native';
-import { FlatList, GestureHandlerRootView } from 'react-native-gesture-handler';
-import PagerItem from '../items/PagerEventItem';
+﻿import LostItemCard from "@/components/items/LostItemCard";
+import SearchFilterBar from "@/components/items/SearchFilterBar";
+import { Text } from "@/theme/Themed";
+import { isAdmin$ } from "@/utilities/AdminUtils";
+import { setDefaultFoundItemData } from "@/utilities/Events";
+import { LostItem, LostItemCategory, foundItems$ } from "@/utilities/EventsStore";
+import { useSelector } from "@legendapp/state/react";
+import { router } from "expo-router";
+import React from "react";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
+import { Chip } from "react-native-paper";
 
-import Pager, { InfinitePagerImperativeApi, Preset } from 'react-native-infinite-pager';
-// import { pagerDateData$, setDefaultEventData, setEventData } from '../utilities/Events';
-import { observable } from '@legendapp/state';
-// import { formatDate } from '../utilities/Pickers';
-// import { routeState$, stateNavigator } from '../nav/stateNavigator';
-// import { set } from 'date-fns';
-import Calendar, { CalendarImperativeApi } from 'react-native-swipe-calendar';
-// import { setDefaultScheduleData } from '../utilities/Schedules';
-// import { initialScheduleIndex$ } from './edit/Schedule';
+const STATUS_FILTERS = [
+  { label: "All", value: "all" },
+  { label: "Found", value: "found" },
+  { label: "Claimed", value: "claimed" },
+] as const;
 
-const formatDate = (date: Date) => {
-  const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
-  return date.toLocaleDateString(undefined, options);
-};
+type FilterValue = (typeof STATUS_FILTERS)[number]["value"];
 
-const calendarIndexDate$ = observable(new Date());
+const LostItemFeed = () => {
+  const [filter, setFilter] = React.useState<FilterValue>("all");
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [selectedCategories, setSelectedCategories] = React.useState<LostItemCategory[]>([]);
+  const isAdmin = useSelector(() => isAdmin$.get());
 
-// const configurePersistence = async() => {
-//     try {
-//         configureObservablePersistence({
-//         pluginLocal: ObservablePersistAsyncStorage,
-//         localOptions: {
-//           asyncStorage: {
-//             AsyncStorage,
-//           },
-//         },
-//       });
-//     } catch (error) {
-//       console.error("Error configuring persistence:", error);
-//     }
-// };
+  const toggleCategory = (cat: LostItemCategory) => {
+    setSelectedCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
 
-export const initialIndex$ = observable(0);
-export const onPageChangeInitialIndexState$ = observable(0);
+  const sorted = useSelector(() => {
+    const all = Object.values(foundItems$.get() || {}) as LostItem[];
+    const visible = all.filter(
+      (item) =>
+        !!item &&
+        (filter === "all" || item.status === filter)
+    );
+    return [...visible].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  });
 
-// const persistInitialIndex = async() => {
-//   try {
-//       persistObservable(initialIndex$, {
-//           local: `initialIndex`,
-//       });
-//       persistObservable(onPageChangeInitialIndexState$, {
-//           local: `onPageChangeInitialIndexState`,
-//       });
-//   } catch (error) {
-//     console.error("Error persisting initialIndex:", error);
-//   }
-// }
+  const displayed = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return sorted.filter((item) => {
+      const matchesQuery =
+        !q ||
+        item.title.toLowerCase().includes(q) ||
+        (item.description || '').toLowerCase().includes(q);
+      const matchesCat =
+        selectedCategories.length === 0 || selectedCategories.includes(item.category);
+      return matchesQuery && matchesCat;
+    });
+  }, [sorted, searchQuery, selectedCategories]);
 
-// configurePersistence();
-// persistInitialIndex();
-
-// Function to format the date key
-const formatDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-};
-
-// Compute the day index difference between a date and today using UTC midnights.
-// This avoids DST and timezone-caused millisecond differences that can produce
-// fractional days when using local ms arithmetic.
-const msPerDay = 24 * 60 * 60 * 1000;
-const dayIndexFromToday = (d: Date) => {
-  const today = new Date();
-  const utcD = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-  const utcToday = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.trunc((utcD - utcToday) / msPerDay);
-};
-
-// Helper function to convert milliseconds to hours and minutes
-const formatDuration = (ms: number): string => {
-  const totalMinutes = Math.floor(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) {
-    return `${minutes}min`
-  }
-  else if (minutes === 0) {
-    return `${hours}h`;
-  } 
-  else {
-    return `${hours}h ${minutes}min`;
-  }
-  
-};
-
-const getTitle = (index: number) => {
-  if (index === 0) return 'Today';
-  else if (index === 1) return 'Tomorrow';
-  else if (index === -1) return 'Yesterday';
-  else if (index > 1 && index < 11) return `in ${index} days`;
-  else if (index < -1 && index > -11) return `${-index} days ago`;
-
-  return '';
-}
-
-const CarouselPage = ({ index }: { index: number }) => {
-  
-      const [currentTime, setCurrentTime] = useState(new Date());
-
-        useEffect(() => {
-          const interval = setInterval(() => {
-            setCurrentTime(new Date());
-          }, 1000);
-          return () => clearInterval(interval);
-        }, []);
-      // !!! cannot change the state of events from here !!!
-      const title = getTitle(index);
-      const dateTitle = formatDate(new Date(new Date().setDate(new Date().getDate() + index)));
-  
-      const blankStartDate = new Date();
-      blankStartDate.setDate(new Date().getDate() + index);
-      blankStartDate.setHours(0, 0, 0, 0);
-
-      const blankEndDate = new Date();
-      blankEndDate.setDate(new Date().getDate() + index + 1);
-      blankEndDate.setHours(0, 0, 0, 0);
-  
-      const date = new Date(currentTime);
-      date.setDate(new Date().getDate() + index);
-      const dateStr: string = formatDateKey(date);
-
-      // console.log('schedule events: ', filterScheduleEvents(dateStr));
-      
-      const filteredEvents = [
-        ...(getEventsForDate(dateStr) || []).map((event: any) => ({
-            ...event,
-            startDate: new Date(event.startDate),
-            endDate: new Date(event.endDate),
-        })),
-        ...filterRepeatingEvents(dateStr).map((event: any) => ({
-            ...event,
-            startDate: new Date(event.startDate),
-            endDate: new Date(event.endDate),
-        })),
-        ...filterScheduleEvents(dateStr).map((event: any) => ({
-            ...event,
-            startDate: new Date(event.startDate),
-            endDate: new Date(event.endDate),
-        })),
-      ];
-      filteredEvents.sort((a: any, b: any) => a.startDate.getTime() - b.startDate.getTime());
-  
-      // creating empty blocks around events in the FlatList
-      let compareTime = new Date(date);
-      compareTime.setHours(0, 0, 0, 0);
-      
-      const emptyBlocks = [];
-      
-      for (let i = 1; i < filteredEvents.length + 1; i++) {
-        if (new Date(filteredEvents[i-1].startDate) > compareTime && new Date(filteredEvents[i-1].startDate).getTime() - compareTime.getTime() >= 60000) {
-          const duration = formatDuration(filteredEvents[i-1].startDate.getTime() - compareTime.getTime());
-          emptyBlocks.push({         
-            title: duration,
-            startDate: compareTime,
-            endDate: filteredEvents[i-1].startDate,
-            description: '',
-            blank: true,
-            id: dateStr + '-' + i + '-blank',
-          });
-        }
-        compareTime = filteredEvents[i-1].endDate;
-      }
-  
-      
-      // !!! endDate in the next day could require a special display logic !!!
-      const nextDate = new Date(compareTime);
-      nextDate.setDate(compareTime.getDate() + 1);
-      nextDate.setHours(0, 0, 0, 0);
-      
-      if (compareTime < blankEndDate) {
-        const duration = formatDuration(nextDate.getTime() - compareTime.getTime());
-        emptyBlocks.push({        
-          title: duration,
-          startDate: compareTime,
-          endDate: nextDate,
-          description: '',
-          blank: true,
-          id: dateStr + '-' + emptyBlocks.length + 1 + '-blank',
-        });
-      }
-  
-      // merging and sorting the events and empty blocks
-      const finalEvents = [...filteredEvents, ...emptyBlocks];
-      finalEvents.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-      
-      return (
-        <Pressable onPress={() => {
-          // stateNavigator.navigate('edit-day')
-        }} 
-          style={{ marginHorizontal: 16, paddingVertical: 10, borderRadius: 25, backgroundColor: 'rgba(69, 69, 120, 0.6)'}}>
-        <View style={styles.slide}>
-
-          <View style={{ marginHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-          <Text style={styles.header}>{title}</Text>
-          <Text style={styles.header}>{dateTitle}</Text>
-          </View>
-          
-          <FlatList
-            data={finalEvents}
-            keyExtractor={(item) => `${item.id}-${item.modified}`} // Ensure a unique string key
-            keyboardShouldPersistTaps="handled"
-            scrollEventThrottle={16}
-            removeClippedSubviews={false}
-            initialNumToRender={10}
-            maxToRenderPerBatch={5}
-            windowSize={10}
-            getItemLayout={undefined}
-            renderItem={({ item }) => (
-              <PagerItem event={item} />
-            )}
-          />
+  return (
+    <View style={styles.container}>
+      {/* Header row with title + add button */}
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.heading}>Findora</Text>
+          <Text style={styles.subtitle}>
+            University Lost & Found
+          </Text>
         </View>
-        {/* </HoldItem> */}
-        </Pressable>
-      );
-      
-    };
-
-const MyPager = observer(() => {
-    const goToTodayVisible = onPageChangeInitialIndexState$.get() !== 0;
-    // Use SLIDE preset on web to avoid pageInterpolatorCube initialization error
-    const [preset, setPreset] = useState<Preset>(Platform.OS === 'web' ? Preset.SLIDE : Preset.SLIDE);
-    const [screenData, setScreenData] = useState(Dimensions.get('window'));
-
-    //Render count
-    const renderCount = React.useRef(1).current++
-
-    const pagerRef = React.useRef<InfinitePagerImperativeApi>(null);
-  // when true, the next pager onPageChange was triggered by the calendar touch
-  const suppressSetSelectedDate = React.useRef(false);
-  const suppressFirstTime = React.useRef(0);
-
-    // Handle orientation changes
-    useEffect(() => {
-      const subscription = Dimensions.addEventListener('change', ({ window }) => {
-        setScreenData(window);
-      });
-      return () => subscription?.remove();
-    }, []);
-
-    // Handle pager ref updates when orientation changes
-    useEffect(() => {
-      if (pagerRef.current) {
-        // Force a layout update after orientation change
-        setTimeout(() => {
-          if (pagerRef.current) {
-            const currentIndex = onPageChangeInitialIndexState$.get();
-            pagerRef.current.setPage(currentIndex, { animated: false });
-          }
-        }, 100);
-      }
-    }, [screenData.width, screenData.height]);
-
-    const handleIncrement = () => {
-      if (pagerRef.current) {
-        pagerRef.current.incrementPage({ animated: true });
-      }
-    };
-  
-    const handleDecrement = () => {
-      if (pagerRef.current) {
-        pagerRef.current.decrementPage({ animated: true });
-      }
-    };
-
-    const transformDateToMonday = (date: Date): Date => {
-      const day = date.getDay(); // 0 (Sun) to 6 (Sat)
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
-      date.setDate(diff)
-      date.setHours(0, 0, 0, 0);
-      console.log('CalendarIndexDate: ', calendarIndexDate$.get());
-      console.log('Returning Monday date: ', date);
-      return new Date(date);
-    };
-    
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const calendarRef = React.useRef<CalendarImperativeApi>(null);
-    
-  
-    const onPageChange = (index: number) => {
-      // const newStartDate = new Date(new Date().setDate(new Date().getDate() + index));
-      // newStartDate.setHours(0, 0, 0, 0);
-      // pagerDateData$.baseStartDate.set(newStartDate);
-      // const oldStartDate = pagerDateData$.currentScreenStartDate.get();
-      // pagerDateData$.currentScreenStartDate.set(newStartDate);
-      // const newEndDate = new Date(new Date().setDate(new Date().getDate() + index + 1));
-      // newEndDate.setHours(0, 0, 0, 0);
-      // pagerDateData$.baseEndDate.set(newEndDate);
-      // pagerDateData$.currentScreenEndDate.set(newEndDate);
-
-      // onPageChangeInitialIndexState$.set(index);
-
-      // // If this page change was initiated by the calendar (user tapped a day),
-      // // don't clear the selected date here. The calendar initiated the change
-      // // and will keep selection as appropriate.
-      // if (suppressSetSelectedDate.current) {
-      //   suppressSetSelectedDate.current = false;
-      // } else {
-      //   setSelectedDate(new Date(new Date().setDate(new Date().getDate() + index)));
-
-      //   if (suppressFirstTime.current < 1) {
-      //     suppressFirstTime.current += 1;
-      //     return;
-      //   }
-      //   else {
-      //     // if (selectedDate) {
-      //     //   console.log('aaaaasssss', selectedDate)
-      //     //   calendarRef.current?.setPage(selectedDate)
-      //     // }
-      //     // define if it is previous or next week for calendar page change
-      //     const mondayCurrentWeekPageDate = transformDateToMonday(new Date(selectedDate || new Date())); 
-      //     console.log('Calendar Index Date: ', calendarIndexDate$.get());
-      //     const isOnSameWeekPage = calendarIndexDate$.get().getTime() === mondayCurrentWeekPageDate.getTime();
-      //     console.log('Is on same week page: ', isOnSameWeekPage);
-      //     if (newStartDate.getDay() === 0 && oldStartDate.getDay() === 1 
-      //     && ((Math.abs((newStartDate.getTime() - oldStartDate.getTime()) / 86400000) <= 2)
-      //     || (Math.abs((newStartDate.getTime() - oldStartDate.getTime()) / 86400000) >= 25))
-      //     && isOnSameWeekPage) {
-      //       console.log('isOnSameWeekPage triggered decrementPage', isOnSameWeekPage);
-      //       calendarRef.current?.decrementPage({ animated: true });
-      //     }
-      //     else if (newStartDate.getDay() === 1 && oldStartDate.getDay() === 0
-      //     && ((Math.abs((newStartDate.getTime() - oldStartDate.getTime()) / 86400000) <= 2)
-      //     || (Math.abs((newStartDate.getTime() - oldStartDate.getTime()) / 86400000) >= 25))
-      //     && isOnSameWeekPage) {
-      //       console.log('isOnSameWeekPage triggered incrementPage', isOnSameWeekPage);
-      //       calendarRef.current?.incrementPage({ animated: true });
-      //     }
-      //   }
-      // } 
-
-      
-    }
-
-    
-
-    return (
-    <GestureHandlerRootView>
-      <Calendar
-        theme={{ 
-          todayIndicatorDotColor: 'royalblue',
-          headerFontColor: 'white',
-          dayLabelColor: 'white',
-          dayFontColor: 'white',
-          selectedDayFontColor: 'black',
-          selectedDayBackgroundColor: 'goldenrod',
-        }}
-        HeaderComponent={({startDate, endDate}: {startDate: any, endDate: any}) => {
-          return null;
-        }}
-        // DayLabelComponent={({ date }) => {
-        //   return (
-        //     null
-        //   );
-        // }}
-        pageInterval='week'
-        // WeekComponent={({ days }) => {
-        //   return (
-        //     <View style={{ height: 50, flexDirection: 'row', justifyContent: 'space-between', padding: 16}}>
-        //       {days.map((day, index) => (
-        //         <TouchableRipple key={index} onPress={() => void 0}>
-        //           <View style={{ flex: 1, alignItems: 'center' }}>
-        //             <Text style={{ color: 'white' }}>{day.getDate()}</Text>
-        //           </View>
-        //         </TouchableRipple>
-        //       ))}
-        //     </View>
-        //   );
-        // }}
-        weekStartsOn={1}
-        ref={calendarRef}
-        currentDate={currentDate}
-        onDateSelect={(date: any, { isSelected }: {isSelected: any}) => {
-          // set the selected date (calendar tapped)
-          setSelectedDate(date);
-          // mark that this page change comes from the calendar so the pager onPageChange
-          // doesn't clear the selected date.
-          suppressSetSelectedDate.current = true;
-          // compute page index robustly using UTC midnights to avoid DST/timezone shifts
-          const index = dayIndexFromToday(new Date(date));
-          pagerRef.current?.setPage(index, { animated: Math.abs(index - onPageChangeInitialIndexState$.get()) === 1 ? true : false });
-        }}
-        selectedDate={selectedDate}
-        onPageChange={(date: any) => {
-          console.log('Setting Calendar Index Date: ', date);
-          calendarIndexDate$.set(date);
-          // LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          // console.log('Date: ', date);
-
-        }}
-      />
-      <View style={{height: 10}}>
-        {/* <Text>{suppressFirstTime.current}</Text> */}
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              setDefaultFoundItemData();
+              router.navigate("/edit-event");
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addButtonText}>Add Found Item</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <Pager
-        ref={pagerRef}
-        style={styles.pager}
-        renderPage={CarouselPage}
-        vertical={false}
-        initialIndex={initialIndex$.get()}
-        onPageChange={(index: number) => onPageChange(index)}
-        preset={preset}
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterRow}
+        contentContainerStyle={styles.filterContent}
+      >
+        {STATUS_FILTERS.map((f) => (
+          <Chip
+            key={f.value}
+            selected={filter === f.value}
+            onPress={() => setFilter(f.value)}
+            style={styles.filterChip}
+            textStyle={styles.filterChipText}
+            compact
+          >
+            {f.label}
+          </Chip>
+        ))}
+      </ScrollView>
+
+      {/* Search + category filter */}
+      <SearchFilterBar
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        selectedCategories={selectedCategories}
+        onToggleCategory={toggleCategory}
       />
 
-        {/* <Pressable style={[styles.dec, { top: screenData.height * 0.45 }]} onPress={() => handleIncrement()}>
-          <Icon source="chevron-right" size={24} />
-        </Pressable>
-        <Pressable style={[styles.inc, { top: screenData.height * 0.45 }]} onPress={() => handleDecrement()}>
-          <Icon source="chevron-left" size={24} />
-        </Pressable> */}
-        {/* {goToTodayVisible ? 
-        <Pressable style={styles.goToToday} onPress={() => {
-          if (pagerRef.current) {
-            pagerRef.current.setPage(0, { animated: false }); // can change this depending on if difference is equal to 1
-            calendarRef.current?.setPage(new Date(), { animated: false });
-          }
-        }}>
-          <Text style={{fontSize: 16, fontWeight: 'bold'}}>Go to Today</Text>
-          <Icon source="arrow-u-left-top" size={24} />
-        </Pressable>
-        :
-         null
-        } */}
-    </GestureHandlerRootView>
-    );
-});
+      {/* Items list */}
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {displayed.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🔍</Text>
+            <Text style={styles.emptyText}>No items yet.</Text>
+            <Text style={styles.emptyHint}>
+              Tap + to report a lost or found item.
+            </Text>
+          </View>
+        ) : (
+          displayed.map((item) => (
+            <LostItemCard key={item.id} item={item} showActions={false} isAdminView={isAdmin} allowClaim={!isAdmin} />
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+};
 
-export default MyPager
+export default LostItemFeed;
 
 const styles = StyleSheet.create({
-    pager: {
-      flex: 1,
-    },
-    inc: {
-      position: 'absolute',
-      left: -20,
-      width: 40,
-      height: 60,
-      backgroundColor: "rgba(255, 255, 255, 0.4)",
-      alignItems: "flex-end",
-      justifyContent: "center",
-      borderRadius: 20,
-    },
-    dec: {
-      position: 'absolute',
-      right: -20,
-      width: 40,
-      height: 60,
-      backgroundColor: "rgba(255, 255, 255, 0.4)",
-      alignItems: "flex-start",
-      justifyContent: "center",
-      borderRadius: 20,
-    },
-    goToToday: {
-      position: 'absolute',
-      bottom: 70,
-      left: 20,
-      height: 40,
-      backgroundColor: "rgba(255, 255, 255, 0.4)",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 20,
-      paddingHorizontal: 10,
-    },
-    slide: {
-      height: '100%',
-    },
-    header: {
-      fontSize: 20,
-      fontWeight: 'bold',
-    }
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    marginBottom: 4,
+  },
+  heading: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#fcba03",
+  },
+  subtitle: {
+    fontSize: 13,
+    color: "#888",
+  },
+  addButton: {
+    backgroundColor: "#fcba03",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#000",
+  },
+  filterRow: {
+    flexGrow: 0,
+    marginBottom: 8,
+  },
+  filterContent: {
+    paddingHorizontal: 12,
+    gap: 8,
+    flexDirection: "row",
+  },
+  filterChip: {
+    marginRight: 4,
+  },
+  filterChipText: {
+    fontSize: 12,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+    gap: 8,
+  },
+  emptyIcon: {
+    fontSize: 48,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#ccc",
+  },
+  emptyHint: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    paddingHorizontal: 32,
+  },
 });

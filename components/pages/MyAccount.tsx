@@ -1,20 +1,18 @@
 import { Text, View } from '@/theme/Themed';
 import React from 'react';
-import { Button, Icon, IconButton } from 'react-native-paper';
+import { Button, Chip, Icon } from 'react-native-paper';
 
 import { firebase } from '@/firebase.config';
-import { formatDateKey, lastUserHandle$, lastUserId$, private$, public$ } from '@/utilities/EventsStore';
+import { lastUserHandle$, lastUserId$, private$, public$ } from '@/utilities/EventsStore';
 import { uploadAvatarImage } from '@/utilities/ImageUpload';
-import { observer } from '@legendapp/state/react';
+import { observer, useSelector } from '@legendapp/state/react';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { reauthenticateWithCredential } from 'firebase/auth';
 import { Image, StyleSheet, TouchableOpacity } from 'react-native';
-// import { cancelAllNotifications } from '@/utilities/Notifications';
 
-import DayEventItem from '@/components/items/DayEventItem';
-import { acceptFollowRequest, getPendingFollowRequests, getUserProfile, loadProfileByHandle, rejectFollowRequest, removeFollower, setSelectedUserProfile, syncSentFollowRequests, toggleProfilePrivacy, unfollowUser } from '@/utilities/UserProfile';
-import { format } from 'date-fns';
+import { isAdmin$ } from '@/utilities/AdminUtils';
+import { acceptFollowRequest, getPendingFollowRequests, getUserProfile, loadProfileByHandle, rejectFollowRequest, setSelectedUserProfile, syncSentFollowRequests } from '@/utilities/UserProfile';
 import { router } from 'expo-router';
 
 export const clearAllData = async () => {
@@ -34,18 +32,13 @@ const MyAccount = observer(() => {
   console.log('User Profile:', userProf?.get());
 
   const [image, setImage] = React.useState<string | null>(null);
-  const [dayOffset, setDayOffset] = React.useState<number>(0);
-  const [finalEvents, setFinalEvents] = React.useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = React.useState<any[]>([]);
-  const [showFollowers, setShowFollowers] = React.useState(false);
-  const [showFollowing, setShowFollowing] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [imageError, setImageError] = React.useState(false);
   const [localExists, setLocalExists] = React.useState(false);
   const [remoteExists, setRemoteExists] = React.useState(false);
   const [checking, setChecking] = React.useState(true);
-  const [followerAvatars, setFollowerAvatars] = React.useState<Record<string, string>>({});
-  const [followingAvatars, setFollowingAvatars] = React.useState<Record<string, string>>({});
+  const isAdmin = useSelector(() => isAdmin$.get());;
 
   // Check avatar image existence
   React.useEffect(() => {
@@ -78,95 +71,6 @@ const MyAccount = observer(() => {
     checkImages();
     return () => { cancelled = true; };
   }, [image, getUserProfile()?.avatar.get()]);
-
-  // Load events for day offset
-  React.useEffect(() => {
-    const loadEvents = async () => {
-      const userId = firebase.auth().currentUser?.uid;
-      if (!userId) {
-        setFinalEvents([]);
-        return;
-      }
-      try {
-        const date = new Date();
-        date.setDate(date.getDate() + dayOffset);
-        const key = formatDateKey(date);
-        
-        const snap = await firebase
-          .database()
-          .ref(`/sharedContent/${userId}/events/${key}`)
-          .once('value');
-        
-        if (!snap.exists()) {
-          setFinalEvents([]);
-          return;
-        }
-        
-        const val = snap.val();
-        const list = Array.isArray(val) ? val.filter(Boolean) : Object.values(val || {});
-        
-        const normalized = (list || []).map((ev: any) => ({
-          ...ev,
-          startDate: ev.startDate ? new Date(ev.startDate) : null,
-          endDate: ev.endDate ? new Date(ev.endDate) : null,
-        }));
-
-        const filteredEvents = normalized
-          .filter((e: any) => e.startDate && e.endDate)
-          .sort((a: any, b: any) => a.startDate.getTime() - b.startDate.getTime());
-
-        const compareBase = new Date();
-        compareBase.setDate(new Date().getDate() + dayOffset);
-        compareBase.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(compareBase);
-        endOfDay.setDate(endOfDay.getDate() + 1);
-
-        const formatDuration = (ms: number): string => {
-          const totalMinutes = Math.floor(ms / 60000);
-          const hours = Math.floor(totalMinutes / 60);
-          const minutes = totalMinutes % 60;
-          if (hours === 0) return `${minutes}min`;
-          if (minutes === 0) return `${hours}h`;
-          return `${hours}h ${minutes}min`;
-        };
-
-        const emptyBlocks: any[] = [];
-        let compareTime = new Date(compareBase);
-        for (let i = 0; i < filteredEvents.length; i++) {
-          const ev = filteredEvents[i];
-          if (ev.startDate > compareTime && ev.startDate.getTime() - compareTime.getTime() >= 60000) {
-            const duration = formatDuration(ev.startDate.getTime() - compareTime.getTime());
-            emptyBlocks.push({
-              title: duration,
-              startDate: new Date(compareTime),
-              endDate: new Date(ev.startDate),
-              blank: true,
-              id: `${formatDateKey(compareBase)}-${i}-blank`,
-            });
-          }
-          compareTime = ev.endDate;
-        }
-        if (compareTime < endOfDay) {
-          const duration = formatDuration(endOfDay.getTime() - compareTime.getTime());
-          emptyBlocks.push({
-            title: duration,
-            startDate: new Date(compareTime),
-            endDate: new Date(endOfDay),
-            blank: true,
-            id: `${formatDateKey(compareBase)}-${emptyBlocks.length + 1}-blank`,
-          });
-        }
-
-        const merged = [...filteredEvents, ...emptyBlocks].sort(
-          (a: any, b: any) => (a.startDate?.getTime?.() || 0) - (b.startDate?.getTime?.() || 0)
-        );
-        setFinalEvents(merged);
-      } catch (e) {
-        setFinalEvents([]);
-      }
-    };
-    loadEvents();
-  }, [dayOffset]);
 
   // Load pending follow requests if private profile
   React.useEffect(() => {
@@ -218,15 +122,6 @@ const MyAccount = observer(() => {
     })();
   }, []);
 
-  const getTitle = (index: number) => {
-    if (index === 0) return 'Today';
-    else if (index === 1) return 'Tomorrow';
-    else if (index === -1) return 'Yesterday';
-    else if (index > 1 && index < 11) return `in ${index} days`;
-    else if (index < -1 && index > -11) return `${-index} days ago`;
-    return '';
-  };
-
   const handleAcceptRequest = async (requesterHandle: string) => {
     const userProf = getUserProfile();
     const handle = userProf?.handle.get();
@@ -259,58 +154,6 @@ const MyAccount = observer(() => {
       setPendingRequests(requests);
     } catch (e: any) {
       alert(e?.message || 'Failed to reject request');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleRemoveFollower = async (followerId: string) => {
-    const userProf = getUserProfile();
-    const handle = userProf?.handle.get();
-    if (!handle) return;
-    setActionLoading(followerId);
-    try {
-      await removeFollower(handle, followerId);
-      const profile = await loadProfileByHandle(handle);
-      if (profile && userProf) {
-        userProf.followers.set(profile.followers || {});
-      }
-    } catch (e: any) {
-      alert(e?.message || 'Failed to remove follower');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleTogglePrivacy = async () => {
-    const userProf = getUserProfile();
-    const handle = userProf?.handle.get();
-    if (!handle || !userProf) return;
-    setActionLoading('privacy');
-    try {
-      const newIsPublic = !userProf.isPublic.get();
-      await toggleProfilePrivacy(handle, newIsPublic);
-      userProf.isPublic.set(newIsPublic);
-    } catch (e: any) {
-      alert(e?.message || 'Failed to update privacy');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleUnfollow = async (targetUserId: string) => {
-    const userProf = getUserProfile();
-    const handle = userProf?.handle.get();
-    if (!handle) return;
-    setActionLoading(targetUserId);
-    try {
-      await unfollowUser(handle, targetUserId);
-      const profile = await loadProfileByHandle(handle);
-      if (profile && userProf) {
-        userProf.following.set(profile.following || {});
-      }
-    } catch (e: any) {
-      alert(e?.message || 'Failed to unfollow');
     } finally {
       setActionLoading(null);
     }
@@ -419,88 +262,6 @@ const MyAccount = observer(() => {
     
   }
 
-  // Normalize followers/following which may be stored as object maps or arrays
-  const followersRaw = userProf?.followers?.get();
-  const followingRaw = userProf?.following?.get();
-  
-  // Extract followers with their handles and avatars
-  const followersList = Array.isArray(followersRaw)
-    ? followersRaw.map((id: string) => ({ userId: id, handle: id, avatar: '' }))
-    : followersRaw && typeof followersRaw === 'object'
-      ? Object.keys(followersRaw).map(userId => ({
-          userId,
-          handle: followersRaw[userId]?.handle || userId,
-          avatar: ''
-        }))
-      : [];
-  
-  // Extract following with their handles and avatars
-  const followingList = Array.isArray(followingRaw)
-    ? followingRaw.map((id: string) => ({ userId: id, handle: id, avatar: '' }))
-    : followingRaw && typeof followingRaw === 'object'
-      ? Object.keys(followingRaw).map(userId => ({
-          userId,
-          handle: followingRaw[userId]?.handle || userId,
-          avatar: ''
-        }))
-      : [];
-  
-  const followersCount = followersList.length;
-  const followingCount = followingList.length;
-
-  // Load avatars for followers/following from profiles
-  React.useEffect(() => {
-    const loadFollowerAvatars = async () => {
-      try {
-        const entries = followersList;
-        const results: Record<string, string> = {};
-        await Promise.all(entries.map(async (f) => {
-          try {
-            const snap = await firebase.database().ref(`/profiles/${f.userId}/avatar`).once('value');
-            if (snap.exists()) {
-              results[f.userId] = snap.val() || '';
-            } else {
-              results[f.userId] = '';
-            }
-          } catch {
-            results[f.userId] = '';
-          }
-        }));
-        setFollowerAvatars(results);
-      } catch {
-        setFollowerAvatars({});
-      }
-    };
-    if (followersList.length > 0) loadFollowerAvatars(); else setFollowerAvatars({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(followersList.map(f => f.userId))]);
-
-  React.useEffect(() => {
-    const loadFollowingAvatars = async () => {
-      try {
-        const entries = followingList;
-        const results: Record<string, string> = {};
-        await Promise.all(entries.map(async (f) => {
-          try {
-            const snap = await firebase.database().ref(`/profiles/${f.userId}/avatar`).once('value');
-            if (snap.exists()) {
-              results[f.userId] = snap.val() || '';
-            } else {
-              results[f.userId] = '';
-            }
-          } catch {
-            results[f.userId] = '';
-          }
-        }));
-        setFollowingAvatars(results);
-      } catch {
-        setFollowingAvatars({});
-      }
-    };
-    if (followingList.length > 0) loadFollowingAvatars(); else setFollowingAvatars({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(followingList.map(f => f.userId))]);
-
   return (
     <View style={{ height: '100%', margin: 8}} >
       {/* Profile Card */}
@@ -536,23 +297,11 @@ const MyAccount = observer(() => {
           ) : (
             null
           )}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Button mode="text" compact onPress={() => setShowFollowers(!showFollowers)}>
-            {followersCount} Followers
-          </Button>
-          <Button mode="text" compact onPress={() => setShowFollowing(!showFollowing)}>
-            {followingCount} Following
-          </Button>
-          <Button 
-            mode="text" 
-            compact 
-            onPress={handleTogglePrivacy}
-            loading={actionLoading === 'privacy'}
-            disabled={actionLoading === 'privacy'}
-          >
-            {userProf?.isPublic.get() ? 'Public' : 'Private'}
-          </Button>
-          </View>
+          {isAdmin && (
+            <Chip icon="shield-account" style={styles.adminChip} textStyle={styles.adminChipText}>
+              Admin Account
+            </Chip>
+          )}
           
           {/* Follow Requests Section (Private profiles only) */}
           {!userProf?.isPublic.get() && pendingRequests.length > 0 && (
@@ -600,99 +349,7 @@ const MyAccount = observer(() => {
             </View>
           )}
           
-          {/* Followers List */}
-          {showFollowers && followersList.length > 0 && (
-            <View style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
-              <Text style={[styles.header, { marginTop: 0 }]}>Your Followers</Text>
-              {followersList.map((follower: any) => (
-                <TouchableOpacity 
-                  key={follower.userId} 
-                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}
-                  onPress={() => viewProfile(follower.handle)}
-                >
-                  {followerAvatars[follower.userId] ? (
-                    <Image source={{ uri: followerAvatars[follower.userId] }} style={styles.smallAvatar} />
-                  ) : (
-                    <Image source={require('@/assets/images/icon.png')} style={styles.smallAvatar} />
-                  )}
-                  <Text style={{ flex: 1, marginLeft: 8 }}>{follower.handle}</Text>
-                  <Button 
-                    mode="text" 
-                    compact 
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      handleRemoveFollower(follower.userId);
-                    }}
-                    loading={actionLoading === follower.userId}
-                    disabled={actionLoading !== null}
-                  >
-                    Remove
-                  </Button>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          
-          {/* Following List */}
-          {showFollowing && followingList.length > 0 && (
-            <View style={{ marginTop: 12, padding: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8 }}>
-              <Text style={[styles.header, { marginTop: 0 }]}>Following</Text>
-              {followingList.map((following: any) => (
-                <TouchableOpacity 
-                  key={following.userId} 
-                  style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 }}
-                  onPress={() => viewProfile(following.handle)}
-                >
-                  {followingAvatars[following.userId] ? (
-                    <Image source={{ uri: followingAvatars[following.userId] }} style={styles.smallAvatar} />
-                  ) : (
-                    <Image source={require('@/assets/images/icon.png')} style={styles.smallAvatar} />
-                  )}
-                  <Text style={{ flex: 1, marginLeft: 8 }}>{following.handle}</Text>
-                  <Button 
-                    mode="text" 
-                    compact 
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      handleUnfollow(following.userId);
-                    }}
-                    loading={actionLoading === following.userId}
-                    disabled={actionLoading !== null}
-                  >
-                    Unfollow
-                  </Button>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {/* Events Section */}
-          <View style={{ marginTop: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <IconButton onPress={() => setDayOffset((v) => v - 1)} icon="chevron-left" />
-              {getTitle(dayOffset) !== '' ? (
-              <Text style={styles.header}>{getTitle(dayOffset)}</Text>
-              ) 
-              : 
-              <Text style={[styles.meta, {marginTop: 10, textAlign: 'center', marginBottom: 8 }]}>
-              {format(new Date(new Date().setDate(new Date().getDate() + dayOffset)), 'EEE, MMM d')}
-              </Text>
-              }
-              <IconButton onPress={() => setDayOffset((v) => v + 1)} icon="chevron-right" />
-            </View>
-            {getTitle(dayOffset) !== '' ? (
-            <Text style={[styles.meta, { textAlign: 'center', marginBottom: 8 }]}>
-              {format(new Date(new Date().setDate(new Date().getDate() + dayOffset)), 'EEE, MMM d')}
-            </Text>
-            ) : null
-            }
-            {finalEvents.length === 0 ? (
-              <Text style={styles.bioEmpty}>No posts for this day.</Text>
-            ) : (
-              finalEvents.map((ev: any) => (
-                <DayEventItem key={ev.id} event={ev} />
-              ))
-            )}
-          </View>
+          {/* Events section removed */}
         </View>
       )}
 
@@ -858,5 +515,14 @@ const styles = StyleSheet.create({
     padding: 0,
     width: 24,
     height: 24,
+  },
+  adminChip: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    backgroundColor: 'rgba(252, 186, 3, 0.15)',
+  },
+  adminChipText: {
+    color: '#fcba03',
+    fontWeight: 'bold',
   },
 });

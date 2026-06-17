@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import React, { useEffect, useState } from 'react';
 import { View as DefaultView, Image, StyleSheet } from 'react-native';
 import { Text, View } from '../../theme/Themed';
-import PagerEventTimeSlide from './PagerEventTimeSlide';
+
 
 const formatTime = (selectedTime: Date) => {
   if (!(selectedTime instanceof Date)) {
@@ -65,7 +65,6 @@ export const EventContent = React.memo(({ event }: EventContentProps) => {
   return (
     <View style={!event.blank ? styles.item : styles.blankItem}>
       <View>
-        <PagerEventTimeSlide event={event} />
           <View style={{ paddingVertical: 20, paddingHorizontal: 14 }}>
             <View>
               <View

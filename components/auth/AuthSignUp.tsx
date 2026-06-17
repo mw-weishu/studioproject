@@ -1,5 +1,5 @@
 import { Text, View } from '@/theme/Themed';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, TextInput } from 'react-native-paper';
 
 import { firebase } from '@/firebase.config';
@@ -12,28 +12,28 @@ import { router } from 'expo-router';
  
 const AuthSignUp = () => {
   // const renderCount = React.useRef(1).current++
-  const [handle, setHandle] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async () => {
     if (loading) return;
-    if (!handle) {
-      alert('Please enter a handle');
+    if (!username) {
+      alert('Please enter a username');
       return;
     }
     setLoading(true);
     try {
-      const { available, error } = await checkHandleAvailability(handle);
+      const { available, error } = await checkHandleAvailability(username);
       if (!available) {
-        alert(error || 'Handle not available');
+        alert(error || 'Username not available');
         setLoading(false);
         return;
       }
       const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
-      await claimHandle(cred.user?.uid || '', handle);
-      await persistUserProfile(handle.toLowerCase());
+      await claimHandle(cred.user?.uid || '', username);
+      await persistUserProfile(username.toLowerCase());
       // await notifee.requestPermission();
       alert('Account created');
       if (cred.user) {
@@ -60,10 +60,10 @@ const AuthSignUp = () => {
     <View style={{ height: '100%', alignItems: 'center', justifyContent: 'center' }}>
       {/* <Text>Renders: {renderCount}</Text> */}
       <TextInput 
-        label="Handle" 
+        label="Username" 
         mode='outlined' 
-        value={handle} 
-        onChangeText={setHandle}
+        value={username} 
+        onChangeText={setUsername}
         onKeyPress={handleEnterPress}
         style={{height: 50, width: 300}}
         />
@@ -106,13 +106,11 @@ export default AuthSignUp
 
 const styles = StyleSheet.create({
   button: {
-    // marginHorizontal: 10,
-    width: 100,
+    minWidth: 110,
     margin: 4,
   },
   text: {
     fontSize: 16,
-    // fontWeight: 'bold',
     marginHorizontal: 10
   }
 });

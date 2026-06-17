@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "my-clone",
-    "slug": "my-clone",
+    "name": "Findora",
+    "slug": "findora",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myclone",
+    "scheme": "findora",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

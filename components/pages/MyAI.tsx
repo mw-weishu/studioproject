@@ -158,7 +158,6 @@ const MyAI = () => {
   imageUrl: string,
   image: string | null,
   blank: boolean,
-  eventType: 'pager' | 'schedule' | 'public' | 'saved',
   modified: string (ISO date),
   fullDay: boolean,
   startDate: string (ISO date),
@@ -186,7 +185,6 @@ const MyAI = () => {
 
 Constraints:
 - Ensure startDate < endDate.
-- Use eventType 'pager' unless the prompt clearly indicates schedule/public/saved.
 - If no image, set imageUrl to '' and image to null.
 - If repeats are not requested, set repeats=false and repeatKey='none'.
 - Respond ONLY with JSON, no prose.
@@ -238,7 +236,6 @@ Prompt: ${currentInput}`,
             imageUrl: parsed.imageUrl ?? '',
             image: parsed.image ?? null,
             blank: !!parsed.blank,
-            eventType: parsed.eventType ?? 'pager',
             modified: toLocalDate(parsed.modified) ?? new Date(),
             fullDay: !!parsed.fullDay,
             startDate: toLocalDate(parsed.startDate) ?? new Date(),

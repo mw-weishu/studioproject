@@ -1,8 +1,8 @@
 import { observable } from "@legendapp/state";
-import { selectedEventData$ } from "./Events";
-import { handleApply, selectedRoutineData$ } from "./Routines";
-import { handleApplySavedEvent, selectedSavedEventData$ } from "./Saved";
-import { selectedScheduleData$ } from "./Schedules";
+import { selectedLostItemData$ as selectedEventData$ } from "./Events";
+// Routines removed in Findora
+// Saved utility removed in Findora
+// Schedules removed in Findora
 
 export const formatTime = (selectedTime: any) => {
   if (!(selectedTime instanceof Date)) {
@@ -108,16 +108,13 @@ export const onDateConfirm = (date: Date) => {
         selectedEventData$.endDate.set(localDate);
         break;
     case 'schedule-start':
-        selectedScheduleData$.startDate.set(localDate);
+        // selectedScheduleData$ removed in Findora
         break;
     case 'schedule-apply':
-        selectedRoutineData$.applydate.set(localDate);
-        handleApply();
-        selectedRoutineData$.id.set(null);
+        // selectedRoutineData$ and handleApply removed in Findora
         break;
     case 'saved-event-apply':
-        handleApplySavedEvent(localDate);
-        selectedSavedEventData$.id.set(null);
+        // handleApplySavedEvent removed in Findora
         break;
     default:
         break;

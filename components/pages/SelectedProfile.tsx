@@ -3,11 +3,11 @@ import { Text, View } from '@/theme/Themed';
 import { formatDateKey } from '@/utilities/EventsStore';
 import { canAccessContent, followUser, getUserProfile, loadProfileByHandle, recordSentFollowRequest, selectedUserProfile$, setSelectedUserProfile, unfollowUser, watchFollowAcceptance } from '@/utilities/UserProfile';
 import { observer } from '@legendapp/state/react';
-import { format } from 'date-fns';
+
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet } from 'react-native';
-import { Button } from 'react-native-paper';
+import { Button, Chip } from 'react-native-paper';
 import PublicEventItem from '../items/PublicEventItem';
 
 // This component expects route params with { profile: handle }
@@ -23,6 +23,7 @@ const SelectedProfile = observer(() => {
   const [isFollowing, setIsFollowing] = React.useState<boolean>(false);
   const [followRequestPending, setFollowRequestPending] = React.useState<boolean>(false);
   const [followLoading, setFollowLoading] = React.useState<boolean>(false);
+  const [isAdminProfile, setIsAdminProfile] = React.useState<boolean>(false);
   const watchRef = React.useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -39,6 +40,15 @@ const SelectedProfile = observer(() => {
         console.log('Loaded profile:', profile);
         if (profile) {
           setSelectedUserProfile(profile);
+          // Check if this is an admin account
+          try {
+            const adminSnap = await firebase.database()
+              .ref(`/adminHandles/${handle.toLowerCase()}`)
+              .once('value');
+            setIsAdminProfile(adminSnap.exists());
+          } catch {
+            setIsAdminProfile(false);
+          }
           console.log('Profile userId:', profile.userId);
           console.log('Profile isPublic:', profile.isPublic);
           
@@ -335,6 +345,11 @@ const SelectedProfile = observer(() => {
           {selectedUserProfile$.displayName && selectedUserProfile$.displayName.get() !== selectedUserProfile$.handle.get() && (
             <Text style={styles.displayName}>{selectedUserProfile$.displayName.get()}</Text>
           )}
+          {isAdminProfile && (
+            <Chip icon="shield-account" style={styles.adminChip} textStyle={styles.adminChipText}>
+              Admin Account
+            </Chip>
+          )}
           {(() => {
             const viewerUidNow = firebase.auth().currentUser?.uid;
             const isOwner = viewerUidNow && viewerUidNow === selectedUserProfile$.userId.get();
@@ -344,9 +359,6 @@ const SelectedProfile = observer(() => {
               <Text style={styles.bio}>{selectedUserProfile$.bio.get()}</Text>
             ) : null;
           })()}
-          <Text style={styles.meta}>Followers: {selectedUserProfile$.followers.get().length}</Text>
-          <Text style={styles.meta}>Following: {selectedUserProfile$.following.get().length}</Text>
-          {/* <Text style={styles.meta}>Visibility: {selectedUserProfile$.isPublic.get() ? 'Public' : 'Private'}</Text> */}
           
           {/* Follow/Unfollow Button */}
           {firebase.auth().currentUser?.uid && firebase.auth().currentUser?.uid !== selectedUserProfile$.userId.get() && (
@@ -374,7 +386,7 @@ const SelectedProfile = observer(() => {
               <Button mode="text" onPress={() => setDayOffset((v) => v + 1)}>Next</Button>
             </View>
             <Text style={[styles.meta, { textAlign: 'center', marginBottom: 8 }]}>
-              {format(new Date(new Date().setDate(new Date().getDate() + dayOffset)), 'EEE, MMM d')}
+              {new Date(new Date().setDate(new Date().getDate() + dayOffset)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </Text>
             {finalEvents.length === 0 ? (
               <Text style={styles.bioEmpty}>No events for this day.</Text>
@@ -399,13 +411,15 @@ export default SelectedProfile;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  card: { padding: 16, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: 'gray' },
-  avatar: { width: 64, height: 64, borderRadius: 32, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.08)' },
+  card: { padding: 16, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: 'gray', marginBottom: 16 },
+  avatar: { width: 50, height: 50, borderRadius: 20, marginBottom: 8, backgroundColor: 'rgba(255,255,255,0.08)' },
   handle: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   displayName: { fontSize: 18, marginBottom: 8 },
   bio: { marginBottom: 12 },
   bioEmpty: { fontStyle: 'italic', color: 'gray', marginBottom: 12 },
   meta: { fontSize: 14, color: 'gray' },
   error: { color: 'red', marginVertical: 12 },
-    header: { fontSize: 18, fontWeight: 'bold' },
+  header: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 5 },
+  adminChip: { alignSelf: 'flex-start', marginBottom: 10, backgroundColor: 'rgba(252, 186, 3, 0.15)' },
+  adminChipText: { color: '#fcba03', fontWeight: 'bold' },
 });

@@ -1,599 +1,374 @@
-import { handleAdd, handleDelete, handleModify, selectedSavedEventData$ } from '@/utilities/Saved';
-import { observer, Switch } from '@legendapp/state/react';
-import * as FileSystem from 'expo-file-system';
-import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import React from 'react';
-import { Image, StyleSheet, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Button, Icon, IconButton, Menu, Switch as Toggle, TouchableRipple } from 'react-native-paper';
-import { firebase } from '../../firebase.config';
-import { Pressable, Text, TextInput } from '../../theme/Themed';
-import { handleAddScheduleEvent, handleDeleteEvent, handleDeleteScheduleEvent, handleModifyEvent, handleModifyScheduleEvent, handleSaveEvent, selectedEventData$ } from '../../utilities/Events';
-import { uploadEventImage } from '../../utilities/ImageUpload';
-import { formatDate, openDate$, openTime$ } from '../../utilities/Pickers';
-import { selectedScheduleData$ } from '../../utilities/Schedules';
-import ToggleSwitch from '../ToggleSwitch';
+﻿import { Text } from "@/theme/Themed";
+import {
+    handleDeleteLostItem,
+    handleSaveLostItem,
+    isAdminAdd$,
+    selectedLostItemData$
+} from "@/utilities/Events";
+import { LostItemCategory } from "@/utilities/EventsStore";
+import { observer, useSelector } from "@legendapp/state/react";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React from "react";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
+import {
+    Button,
+    Chip,
+    Divider,
+    IconButton,
+    Menu,
+    TextInput,
+} from "react-native-paper";
 
-const formatTime = (selectedTime: Date) => {
-    if (!(selectedTime instanceof Date)) {
-      selectedTime = new Date(selectedTime);
+const CATEGORIES: { value: LostItemCategory; label: string; icon: string }[] = [
+  { value: "electronics", label: "Electronics", icon: "📱" },
+  { value: "clothing", label: "Clothing", icon: "👕" },
+  { value: "documents", label: "Documents", icon: "📄" },
+  { value: "accessories", label: "Accessories", icon: "👜" },
+  { value: "keys", label: "Keys", icon: "🔑" },
+  { value: "bags", label: "Bags", icon: "🎒" },
+  { value: "books", label: "Books", icon: "📚" },
+  { value: "other", label: "Other", icon: "📦" },
+];
+
+const STATUSES = [
+  { value: "lost", label: "Lost", color: "#e53935" },
+  { value: "found", label: "Found", color: "#43a047" },
+  { value: "claimed", label: "Claimed", color: "#757575" },
+] as const;
+
+const LostItemForm = observer(() => {
+  const [saving, setSaving] = React.useState(false);
+  const [menuVisible, setMenuVisible] = React.useState(false);
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string>>({});
+
+  const data = selectedLostItemData$.get();
+  const isAdminMode = useSelector(() => isAdminAdd$.get());
+  const isEdit = !!data.createdAt && !!data.id && data.title !== "" && !isAdminMode;
+
+  const validate = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!data.title.trim()) {
+      errors.title = 'Title is required.';
     }
-    const formattedTime = selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return formattedTime;
+    const dateStr = data.dateLostFound ? data.dateLostFound.slice(0, 10) : '';
+    if (!dateStr) {
+      errors.date = 'Date is required.';
+    } else {
+      const parsed = new Date(dateStr);
+      if (isNaN(parsed.getTime())) {
+        errors.date = 'Invalid date. Please use YYYY-MM-DD format.';
+      }
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
-type Weekday = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      selectedLostItemData$.image.set(result.assets[0].uri);
+    }
+  };
 
-const Regular = observer(() => {
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      await handleSaveLostItem();
+      router.back();
+    } catch (e: any) {
+      alert(e?.message || "Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const [visible, setVisible] = React.useState(false)
-
-  const openMenu = () => {
-    setVisible(true);
-  }
-
-  const closeMenu = () => {
-    setVisible(false);
-  }
-
-  return (
-    <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-      <Text style={{textAlign: 'center', fontWeight: 'bold'}}>
-        Repeat every
-      </Text>
-      <TextInput
-        inputMode='numeric'
-        keyboardType='numeric'
-        style={{width: 40, height: 28, marginHorizontal: 10, textAlign: 'center', borderWidth: 1, borderRadius: 5, borderColor: 'grey'}}
-        maxLength={4}
-        value={selectedEventData$.repeatRule.regular.number.get()}
-        // only numbers
-        onChangeText={(text) => {
-          const updatedtext = text.replace(/[^0-9]/g, '');
-          if (updatedtext === '0') {
-            selectedEventData$.repeatRule.regular.number.set('1');
-            return;
-          }
-          selectedEventData$.repeatRule.regular.number.set(updatedtext);
-        }}
-      />
-      <Menu
-      visible={visible}
-      onDismiss={closeMenu}
-      anchor={
-        <Pressable
-        onPress={openMenu}
-        style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}
-        >
-          <Text style={{fontWeight: 'bold'}}>
-            {/* {selectedEventData$.repeatRule.regular.unit.get()} */}
-            {selectedEventData$.repeatRule.regular.number.get() === '1' ? 'day' : 'days'}
-          </Text>
-          {/* <View style={{borderRadius: '100%', borderWidth: 1, borderColor: 'grey', marginLeft: 8}} >
-          <Icon source='chevron-down' size={24}/>
-          </View> */}
-        </Pressable>
-      }>
-          <Menu.Item onPress={() => {selectedEventData$.repeatRule.regular.unit.set('days'); closeMenu()}} title="days" />
-          {/* <Menu.Item onPress={() => {selectedEventData$.repeatRule.regular.unit.set('weeks'); closeMenu()}} title="weeks" /> */}
-          {/* <Divider /> */}
-          {/* <Menu.Item onPress={() => {selectedEventData$.repeatRule.regular.unit.set('months'); closeMenu()}} title="months" />
-          <Menu.Item onPress={() => {selectedEventData$.repeatRule.regular.unit.set('years'); closeMenu()}} title="years" /> */}
-      </Menu>
-    </View>
-  )
-});
-
-
-const Weekdays = observer(() => {
-  const start = selectedEventData$.startDate.get();
-  const end = selectedEventData$.endDate.get();
-
-  const monday = selectedEventData$.repeatRule.weekdays.monday.active.get();
-  const tuesday = selectedEventData$.repeatRule.weekdays.tuesday.active.get();
-  const wednesday = selectedEventData$.repeatRule.weekdays.wednesday.active.get();
-  const thursday = selectedEventData$.repeatRule.weekdays.thursday.active.get();
-  const friday = selectedEventData$.repeatRule.weekdays.friday.active.get();
-  const saturday = selectedEventData$.repeatRule.weekdays.saturday.active.get();
-  const sunday = selectedEventData$.repeatRule.weekdays.sunday.active.get();
-
-
-  const toggleDay = (day: Weekday) => () => {
-    selectedEventData$.repeatRule.weekdays[day].active.toggle();
-  }
+  const handleDelete = async () => {
+    if (!data.id) return;
+    setSaving(true);
+    try {
+      await handleDeleteLostItem(data.id);
+      router.back();
+    } catch (e: any) {
+      alert(e?.message || "Failed to delete.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.monday.active.get()}
-        onValueChange={toggleDay('monday')}
-        />
-        <Text>Monday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6, opacity: monday ? 1 : 0}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.tuesday.active.get()}
-        onValueChange={toggleDay('tuesday')}
-        />
-        <Text>Tuesday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.wednesday.active.get()}
-        onValueChange={toggleDay('wednesday')}
-        />
-        <Text>Wednesday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.thursday.active.get()}
-        onValueChange={toggleDay('thursday')}
-        />
-        <Text>Thursday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.friday.active.get()}
-        onValueChange={toggleDay('friday')}
-        />
-        <Text>Friday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.saturday.active.get()}
-        onValueChange={toggleDay('saturday')}
-        />
-        <Text>Saturday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-      <View style={{marginLeft: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Toggle
-        value={selectedEventData$.repeatRule.weekdays.sunday.active.get()}
-        onValueChange={toggleDay('sunday')}
-        />
-        <Text>Sunday</Text>
-        </View>
-        {/* <View style={{flexDirection: 'row', alignItems: 'center'}}>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{start ? formatTime(selectedEventData$.startDate.get()) : '?'}</Text>
-        </Pressable>
-        <Text> - </Text>
-        <Pressable onPress={() => void 0} style={{padding: 3, borderWidth: 1, borderRadius: 8, marginVertical: 4,   borderColor: 'grey'}} >
-        <Text>{end ? formatTime(selectedEventData$.endDate.get()) : '?'}</Text>
-        </Pressable>
-        <Pressable onPress={() => void 0} style={{marginLeft: 6}}>
-        <Icon source='close' size={24}/>
-        </Pressable>
-        </View> */}
-      </View>
-    </View>
-  )
-});
-
-
-const Event = observer(() => {
-    const [imageError, setImageError] = React.useState(false);
-    const [localExists, setLocalExists] = React.useState(false);
-    const [remoteExists, setRemoteExists] = React.useState(false);
-    const [isChecking, setIsChecking] = React.useState(true);
-    const [checking, setChecking] = React.useState(true);
-
-    const imageUri = selectedEventData$.imageUrl.get();
-
-    React.useEffect(() => {
-        let cancelled = false;
-        const checkImages = async () => {
-          try {
-            const localUri = selectedEventData$.image.get();
-            const remoteUrl = selectedEventData$.imageUrl.get();
-            if (localUri && localUri.startsWith('file://')) {
-              try {
-                const info = await FileSystem.getInfoAsync(localUri);
-                if (!cancelled) setLocalExists(!!info.exists);
-              } catch {
-                if (!cancelled) setLocalExists(false);
-              }
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header */}
+      <View style={styles.headerRow}>
+        <IconButton icon="arrow-left" size={24} onPress={() => router.back()} />
+        <Text style={styles.screenTitle}>
+          {isAdminMode ? "Add Found Item" : isEdit ? "Edit Item" : "Report Item"}
+        </Text>
+        {isEdit && !isAdminMode && (
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <IconButton
+                icon="dots-vertical"
+                size={24}
+                onPress={() => setMenuVisible(true)}
+              />
             }
-            if (remoteUrl && !localExists) {
-              try {
-                await Image.prefetch(remoteUrl);
-                if (!cancelled) setRemoteExists(true);
-              } catch {
-                if (!cancelled) setRemoteExists(false);
-              }
-            }
-          } finally {
-            if (!cancelled) setChecking(false);
-          }
-        };
-        checkImages();
-        return () => { cancelled = true; };
-      }, [selectedEventData$.image.get(), selectedEventData$.imageUrl.get()]);
-
-    const pickImage = async () => {
-      // No permissions request is necessary for launching the image library
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
-
-      console.log(result);
-
-      if (!result.canceled) {
-        selectedEventData$.image.set(result.assets[0].uri);
-        setImageError(false);
-        setIsChecking(true);
-
-        try {
-          setChecking(true);
-          const userId = firebase.auth().currentUser?.uid;
-          const eventId = selectedEventData$.id.get();
-          const imageUrl = await uploadEventImage(result.assets[0].uri, eventId || 'unknown', userId || 'unknown');
-          selectedEventData$.imageUrl.set(imageUrl);
-          setChecking(false);
-        } catch (error) {
-          console.log('Error uploading image:', error);
-      }
-    };
-    };
-
-    const lineHeight = 20;
-    const eventType = selectedEventData$.eventType.get();
-    const displayUri = localExists ? selectedEventData$.image.get() : remoteExists ? selectedEventData$.imageUrl.get() : null;
-    const expectImage = !!(selectedEventData$.image.get() || selectedEventData$.imageUrl.get());
-    
-    return (
-        <GestureHandlerRootView>
-        <View style={{height: '100%', marginHorizontal: 20}}>
-          {/* <Text> Event Type: {eventType}</Text> */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-          <View style={{flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'center', gap: 10, marginBottom: 10}}>
-          <TouchableRipple onPress={() => router.back()} style={{backgroundColor: 'rgba(255, 255, 255, 0.3)', height: 30, width: 30, borderRadius: 10, justifyContent: 'center', alignItems: 'center'}}>
-            <Icon source="chevron-left" size={30}/>
-          </TouchableRipple>
-          <View style={{flex: 1, height: 50}}>
-          <TextInput
-            placeholder='Event Name'
-            placeholderTextColor={'gray'}
-            value={selectedEventData$.title.get()}
-            onChangeText={(text) => selectedEventData$.title.set(text)}
-            style={{height: 50, fontWeight: 'bold', fontSize: 20, backgroundColor: 'rgba(100, 100, 100, 0.4)', borderRadius: 16, flex: 1, paddingHorizontal: 10}}
-          />
-          </View>
-          {selectedEventData$.repeats.get() &&
-          <ToggleSwitch
-            isOn={selectedEventData$.on.get()}
-            onToggle={() => selectedEventData$.on.toggle()}
-            width={54}
-            height={40}
-            onBackgroundColor="goldenrod"
-            offBackgroundColor="rgb(69, 69, 112)"
-            circleColor="rgba(255, 255, 255, 0.8)"
-            activeTextColor="#aaaaaa"
-            inactiveTextColor="rgba(255, 255, 255, 0.5)"
-            onText="ON"
-            offText="OFF"
-            />
-          }
-          </View>
-          </View>
-          <TextInput
-            placeholder='Description'
-            placeholderTextColor={'gray'}
-            value={selectedEventData$.description.get()}
-            onChangeText={(text) => selectedEventData$.description.set(text)}
-            style={{
-              height: 100,
-              lineHeight,
-              textAlignVertical: 'top',
-              backgroundColor: 'rgba(69, 69, 120, 0.4)',
-              borderRadius: 25,
-              padding: 10,
-              marginBottom: 10,
-            }}
-            multiline={true}
-          />
-          <Button
-          onPress={() => {
-            pickImage();
-          }}
           >
-            Add Media
-          </Button>
-          {expectImage && (
-            displayUri && !checking && !imageError ? (
-              <Image
-                source={{ uri: displayUri }}
-                style={styles.image}
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <View style={styles.imagePlaceholder} />
-            )
-          )}
-          <View style={{justifyContent: 'space-around', backgroundColor: 'rgba(69, 69, 120, 0.4)', borderRadius: 25, paddingVertical: 20, paddingHorizontal: 50}}>
-          {selectedEventData$.fullDay.get() ? null : (
-          <View style={{flexDirection: 'row', justifyContent: 'space-around', marginVertical: 10}}>
-            <Button 
-              style={styles.button} 
-              onPress={() => {
-                openTime$.case.set('start');
-                console.log('start', selectedEventData$.startDate.get());
-                openTime$.time.set(new Date(selectedEventData$.startDate.get()));
-                console.log('openTime$', openTime$);
-                openTime$.open.set(true);
-              }}
-            > 
-              <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>{formatTime(selectedEventData$.startDate.get())}</Text>
-            </Button>
-            <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>-</Text>
-            <Button 
-              style={styles.button} 
-              onPress={() => {
-                openTime$.case.set('end'); 
-                console.log('end', selectedEventData$.endDate.get());
-                openTime$.time.set(new Date(selectedEventData$.endDate.get()));
-                console.log('openTime$', openTime$);
-                openTime$.open.set(true);
-              }}
-            >
-              <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>{formatTime(selectedEventData$.endDate.get())}</Text>
-            </Button>
-          </View>
-          )}
-          {eventType === 'schedule' || eventType === 'saved' ? null : (
-          <View style={{flexDirection: 'row', justifyContent: 'space-around', marginVertical: 10}}>
-            <Button 
-              style={styles.button} 
-              onPress={() => {
-                openDate$.case.set('startend-oneday');
-                openDate$.date.set(selectedEventData$.startDate.get());
-                router.navigate('/date')
-              }}
-            > 
-              <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>{formatDate(selectedEventData$.startDate.get())}</Text>
-            </Button>
-          </View>
-          )}
-          </View>
-          
-          <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4}}>
-            <Text>Notification</Text>
-            <ToggleSwitch
-              isOn={selectedEventData$.notification.get()}
-              onToggle={() => selectedEventData$.notification.toggle()}
-              width={36}
-              height={28}
-              onBackgroundColor="goldenrod"
-              offBackgroundColor="rgb(69, 69, 112)"
-              circleColor="rgba(255, 255, 255, 0.8)"
-              activeTextColor="#aaaaaa"
-              inactiveTextColor="rgba(255, 255, 255, 0.5)"
-              onText=" "
-              offText=" "
-              />
-            </View>
-          </View>
+            <Menu.Item
+              onPress={handleDelete}
+              title="Delete"
+              leadingIcon="delete"
+            />
+          </Menu>
+        )}
+      </View>
 
-          {(eventType === 'schedule' || eventType === 'saved') ? null : (
-          <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4}}>
-            <Text>Repeats</Text>
-            <ToggleSwitch
-              isOn={selectedEventData$.repeats.get()}
-              onToggle={() => selectedEventData$.repeats.toggle()}
-              width={36}
-              height={28}
-              onBackgroundColor="goldenrod"
-              offBackgroundColor="rgb(69, 69, 112)"
-              circleColor="rgba(255, 255, 255, 0.8)"
-              activeTextColor="#aaaaaa"
-              inactiveTextColor="rgba(255, 255, 255, 0.5)"
-              onText=" "
-              offText=" "
-              />
-            </View>
+      <Divider style={styles.divider} />
+
+      {/* Title */}
+      <Text style={styles.label}>Title *</Text>
+      <TextInput
+        mode="outlined"
+        placeholder="e.g. Blue Nike backpack"
+        value={data.title}
+        onChangeText={(t) => {
+          selectedLostItemData$.title.set(t);
+          if (fieldErrors.title) setFieldErrors((e) => ({ ...e, title: '' }));
+        }}
+        style={styles.input}
+        maxLength={100}
+        error={!!fieldErrors.title}
+      />
+      {fieldErrors.title ? <Text style={styles.errorText}>{fieldErrors.title}</Text> : null}
+
+      {/* Description */}
+      <Text style={styles.label}>Description</Text>
+      <TextInput
+        mode="outlined"
+        placeholder="Describe the item in detail..."
+        value={data.description}
+        onChangeText={(t) => selectedLostItemData$.description.set(t)}
+        multiline
+        numberOfLines={4}
+        style={[styles.input, styles.multilineInput]}
+        maxLength={500}
+      />
+
+      {/* Category */}
+      <Text style={styles.label}>Category</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+      >
+        {CATEGORIES.map((cat) => (
+          <Chip
+            key={cat.value}
+            selected={data.category === cat.value}
+            onPress={() => selectedLostItemData$.category.set(cat.value)}
+            style={styles.chip}
+            compact
+          >
+            {cat.icon} {cat.label}
+          </Chip>
+        ))}
+      </ScrollView>
+
+      {/* Location */}
+      <Text style={styles.label}>Location</Text>
+      <TextInput
+        mode="outlined"
+        placeholder="e.g. Library 2nd floor, Science Building..."
+        value={data.location}
+        onChangeText={(t) => selectedLostItemData$.location.set(t)}
+        style={styles.input}
+        maxLength={200}
+      />
+
+      {/* Date lost/found */}
+      <Text style={styles.label}>Date Lost / Found *</Text>
+      <TextInput
+        mode="outlined"
+        placeholder="YYYY-MM-DD"
+        value={data.dateLostFound ? data.dateLostFound.slice(0, 10) : ""}
+        onChangeText={(t) => {
+          const isoApprox = t.length === 10 ? new Date(t).toISOString() : t;
+          selectedLostItemData$.dateLostFound.set(isoApprox);
+          if (fieldErrors.date) setFieldErrors((e) => ({ ...e, date: '' }));
+        }}
+        style={styles.input}
+        maxLength={10}
+        keyboardType="numbers-and-punctuation"
+        error={!!fieldErrors.date}
+      />
+      {fieldErrors.date ? <Text style={styles.errorText}>{fieldErrors.date}</Text> : null}
+
+      {/* Contact info */}
+      <Text style={styles.label}>Contact Info</Text>
+      <TextInput
+        mode="outlined"
+        placeholder="Phone, email, or social handle..."
+        value={data.contactInfo}
+        onChangeText={(t) => selectedLostItemData$.contactInfo.set(t)}
+        style={styles.input}
+        maxLength={200}
+      />
+
+      {/* Photo — hidden for admin "add found item" mode */}
+      {!isAdminMode && (
+        <>
+          <Text style={styles.label}>Photo</Text>
+          <View style={styles.photoSection}>
+            {data.image ? (
+              <View style={styles.imageWrapper}>
+                <Image
+                  source={{ uri: data.image }}
+                  style={styles.previewImage}
+                  resizeMode="cover"
+                />
+                <IconButton
+                  icon="close"
+                  size={18}
+                  style={styles.removeImage}
+                  onPress={() => {
+                    selectedLostItemData$.image.set(null);
+                    selectedLostItemData$.imageUrl.set("");
+                  }}
+                />
+              </View>
+            ) : (
+              <Button
+                mode="outlined"
+                icon="camera"
+                onPress={handlePickImage}
+                style={styles.photoButton}
+              >
+                Add Photo
+              </Button>
+            )}
           </View>
-          )}
-          {selectedEventData$.repeats.get() ? (
-          <View style={{justifyContent: 'space-around', backgroundColor: 'rgba(69, 69, 120, 0.4)', borderRadius: 25, paddingVertical: 20, paddingHorizontal: 30}}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between'}}>
-            <View>
-              <Text style={{fontSize: 20, fontWeight: 'bold', textAlign: 'center'}}>
-                {selectedEventData$.repeatRule.rule.get() === 'regular' ? 'Regular' : 'Weekdays'}
-              </Text>
-            </View>
-            <View style={{flexDirection: 'row', justifyContent: 'flex-start', alignItems: 'flex-start'}}>
-            <IconButton icon='calendar-refresh' size={20} onPress={() => selectedEventData$.repeatRule.rule.set('regular')} style={{height: 20, width: 20}} iconColor={selectedEventData$.repeatRule.rule.get() === 'regular' ? 'goldenrod' : 'gray'}/>
-            <IconButton icon='view-week' size={20} onPress={() => selectedEventData$.repeatRule.rule.set('weekdays')} style={{height: 20, width: 20}} iconColor={selectedEventData$.repeatRule.rule.get() === 'weekdays' ? 'goldenrod' : 'gray'}/>
-            </View>
-          </View>
-          <Switch value={selectedEventData$.repeatRule.rule.get()}>
-            {{
-              regular: () => <Regular/>,
-              weekdays: () => <Weekdays/>,
-            }}
-          </Switch>
-          </View>
-          ) : null}
-        <View style={{width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 20, marginBottom: 20}}>
-            <Button icon='check' style={styles.button} onPress={() => {
-            if (selectedEventData$.title.get() !== ''){
-              if (eventType === 'pager') {
-                if (selectedEventData$.id.get()) {
-                  handleModifyEvent(selectedEventData$.get());
-                } else {
-                  handleSaveEvent();
-                }
-              }
-              else if (eventType === 'saved') {
-                const newEvent = {
-                  ...selectedEventData$.get(),
-                  startDate: selectedEventData$.startDate.get(),
-                  endDate: selectedEventData$.endDate.get(),
-                  applydate: new Date(),
-                  eventType: 'saved',
-                }
-                selectedSavedEventData$.set(newEvent);
-                if (selectedEventData$.id.get()) {
-                  handleModify();
-                }
-                else {
-                  handleAdd();
-                }
-              }
-              else if (eventType === 'schedule') {
-                if (selectedEventData$.id.get()) {
-                  handleModifyScheduleEvent(selectedScheduleData$.dayIndex.get());
-                }
-                else {
-                  handleAddScheduleEvent(selectedScheduleData$.dayIndex.get());
-                }
-              }
-                router.back();
-            }
-            else {
-              alert('Event Name required.')
-            }
-            }}>
-              <Text style={{fontSize: 14, fontWeight: 'bold', textAlign: 'center'}}>Save</Text>
-            </Button>
-            {selectedEventData$.id.get() &&
-            <Button icon='trash-can' style={styles.button} onPress={() => {
-              if (eventType === 'pager') {
-                handleDeleteEvent(selectedEventData$.get() as any);
-              }
-              else if (eventType === 'saved') {
-                const newEvent = {
-                  ...selectedEventData$.get(),
-                  applydate: new Date(),
-                  eventType: 'saved',
-                }
-                selectedSavedEventData$.set(newEvent);
-                handleDelete();
-              }
-              else if (eventType === 'schedule') {
-                handleDeleteScheduleEvent(selectedScheduleData$.dayIndex.get());
-              }
-              router.back();
-            }}>
-              <Text style={{fontSize: 14, fontWeight: 'bold', textAlign: 'center'}}>Delete</Text>
-            </Button>
-            }
-          </View>
-        </View>
-        
-        </GestureHandlerRootView>
-      );
+        </>
+      )}
+
+      <Divider style={styles.divider} />
+
+      {/* Save button */}
+      <Button
+        mode="contained"
+        onPress={handleSave}
+        loading={saving}
+        disabled={saving}
+        style={styles.saveButton}
+        contentStyle={styles.saveButtonContent}
+        buttonColor="#fcba03"
+        textColor="#000"
+      >
+        {isAdminMode ? "Add Found Item" : isEdit ? "Update Item" : "Submit Report"}
+      </Button>
+    </ScrollView>
+  );
 });
 
-export default Event
+export default LostItemForm;
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: 'rgba(69, 69, 120, 0.8)',
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  content: {
+    paddingBottom: 60,
+    paddingHorizontal: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 8,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  divider: {
+    marginVertical: 12,
+    backgroundColor: "#333",
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#aaa",
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#e53935',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: "#111",
+    marginBottom: 4,
+  },
+  multilineInput: {
+    minHeight: 100,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
+  },
+  chip: {
+    marginBottom: 4,
+  },
+  photoSection: {
+    marginBottom: 8,
+  },
+  photoButton: {
+    borderColor: "#555",
+  },
+  imageWrapper: {
+    position: "relative",
+    width: 200,
+    height: 200,
+  },
+  previewImage: {
+    width: 200,
+    height: 200,
     borderRadius: 10,
   },
-  image: {
-    width: '100%',
-    height: 200,
-    borderRadius: 15,
-    marginBottom: 10,
+  removeImage: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
-  imagePlaceholder: {
-    width: '100%',
-    height: 200,
-    marginTop: 10,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)'
+  publicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
   },
-})
+  saveButton: {
+    marginTop: 20,
+    borderRadius: 12,
+  },
+  saveButtonContent: {
+    height: 50,
+  },
+});

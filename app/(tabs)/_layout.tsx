@@ -1,9 +1,10 @@
+import { checkAndSetAdmin, isAdmin$ } from '@/utilities/AdminUtils';
 import { getUserProfile } from '@/utilities/UserProfile';
 import FontAwesome from '@expo/vector-icons/Octicons';
 import { observer } from '@legendapp/state/react';
 import { Stack, Tabs, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Image, Platform, StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
@@ -27,10 +28,12 @@ const TabLayout = observer(function TabLayout() {
   const myHandle = userProf?.handle.get();
 
   React.useEffect(() => {
-    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+    const unsubscribe = firebase.auth().onAuthStateChanged(async (user) => {
       setIsSignedIn(!!user);
-      if (!user) {
-        // router.replace('/landing');
+      if (user) {
+        await checkAndSetAdmin(user.uid);
+      } else {
+        isAdmin$.set(false);
       }
       setIsLoading(false);
     });
@@ -61,61 +64,39 @@ const TabLayout = observer(function TabLayout() {
         name="index"
         options={{
           title: '',
-          // title: 'Home',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="calendar" color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="list-unordered" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="saved"
+        name="lost"
         options={{
           title: '',
-          // title: 'Saved',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="bookmark" color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="package" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="ai"
+        name="claims"
         options={{
           title: '',
-          // title: 'Routime AI',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="sparkle" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: '',
-          // title: 'Search',
-          tabBarIcon: ({ color }) => <FontAwesome size={28} name="search" color={color} />,
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="inbox" color={color} />,
         }}
       />
       <Tabs.Screen
         name="[profile]"
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            navigation.navigate('[profile]', { profile: myHandle });
-          },
-        })}
+        initialParams={{ profile: myHandle ?? '' }}
         options={{
           title: '',
-          tabBarIcon: ({ focused }) => {
-            const avatar = userProf?.avatar.get();
-            return avatar ? (
-              <Image
-                source={{ uri: avatar }}
-                style={[styles.avatar]}
-                  
-              />
-            ) : (
-              <Image
-                source={require('../../assets/images/icon.png')}
-                style={[styles.avatar]}
-              />
-            )
-            
-          },
+          tabBarIcon: ({ color }) => <FontAwesome size={28} name="person" color={color} />,
+          href: myHandle ? { pathname: '/[profile]', params: { profile: myHandle } } : null,
         }}
+      />
+      <Tabs.Screen
+        name="ai"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{ href: null }}
       />
     </Tabs>
   );

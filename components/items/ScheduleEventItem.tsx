@@ -4,7 +4,7 @@ import { View as DefaultView, StyleSheet } from 'react-native';
 import { Pressable, Text, View } from '../../theme/Themed';
 import { HoldItem } from '../HoldItem';
 // import { handleDeleteScheduleEvent, selectedEventData$, setEventData } from '../../utilities/Events';
-import { addToSavedEvents } from '../../utilities/EventsStore';
+// addToSavedEvents removed in Findora
 // import { selectedScheduleData$, setScheduleDataByEventId } from '../../utilities/Schedules';
 
 
@@ -59,7 +59,7 @@ const SavedItem = observer((eventProps: ItemProps) => {
       // stateNavigator.navigate('edit-event');
     }},
     { text: 'Save', icon: 'save', withSeparator: true, onPress: () => {
-      addToSavedEvents(event);
+      // addToSavedEvents removed in Findora
     }},
     { text: 'Delete', icon: 'trash', isDestructive: true, onPress: () => {
       // console.log('event type: ', event.eventType);

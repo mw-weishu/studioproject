@@ -1,4 +1,4 @@
-import { handleAdd, selectedSavedEventData$ } from '@/utilities/Saved';
+// Saved utility removed in Findora
 import { observer } from '@legendapp/state/react';
 import { router } from 'expo-router';
 import React, { useCallback } from 'react';

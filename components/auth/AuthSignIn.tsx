@@ -1,5 +1,5 @@
 import { Text, View } from '@/theme/Themed';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, TextInput } from 'react-native-paper';
 
 import { firebase } from '@/firebase.config';
@@ -88,18 +88,15 @@ export default AuthSignIn
 
 const styles = StyleSheet.create({
   button: {
-    // marginHorizontal: 10,
-    width: 100,
+    minWidth: 110,
     margin: 4,
   },
   buttonkey: {
-    // marginHorizontal: 10,
-    width: 170,
+    minWidth: 170,
     margin: 4,
   },
   text: {
     fontSize: 16,
-    // fontWeight: 'bold',
     marginHorizontal: 10
   }
 });
